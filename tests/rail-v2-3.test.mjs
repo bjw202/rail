@@ -76,19 +76,17 @@ describe('빼기 후보', () => {
     assert.match(u.candidates.why, /2개라 아직 뽑지 않습니다/)
   })
 
-  test('보험이 아니면서 최근 3개 마일스톤 동안 한 번도 막지 않은 부품을 뽑는다', () => {
+  test('보험이 아니면서 최근 3개 마일스톤 동안 막지 않은(증거 부품은 돌지 않은) 부품을 뽑는다', () => {
     const u = usageJson(usageRoot())
-    const c = u.candidates.list
     assert.deepEqual(u.candidates.window, ['M1', 'M2', 'M3'])
-    assert.ok(c.includes('gate:order') && c.includes('commit') && c.includes('stop:budget'), c.join(','))
-    for (const blocked of ['verify', 'stop:human']) assert.ok(!c.includes(blocked), `${blocked} 는 막은 적이 있다`)
-    for (const ins of ['guard-tests', 'stop-check', 'gate:close']) assert.ok(!c.includes(ins), `${ins} 는 기본 보험이다`)
+    assert.deepEqual(u.candidates.list, ['feature-check', 'rehearsal'], '자율 모드가 꺼져 있던 멈춤 규칙과 순서 검사는 후보가 아니다')
+    for (const ins of ['guard-tests', 'stop-check', 'gate:close']) assert.ok(!u.candidates.list.includes(ins), `${ins} 는 기본 보험이다`)
   })
 
   test('config 의 insurance 목록이 보험을 정한다', () => {
-    const u = usageJson(usageRoot({ insurance: ['gate:order'] }))
-    assert.ok(!u.candidates.list.includes('gate:order'))
+    const u = usageJson(usageRoot({ insurance: [] }))
     assert.ok(u.candidates.list.includes('gate:close'), '보험 목록에서 빠진 부품은 후보가 될 수 있다')
+    assert.ok(!u.candidates.list.includes('gate:order'), '순서 검사는 보험이 아니어도 후보가 아니다')
   })
 })
 
@@ -121,7 +119,6 @@ describe('부품 끄기 (policy set disable)', () => {
 
   test('config 에 손으로 보험을 적어도 끄지 않는다', () => {
     const root = milestoneRoot({ disabled: ['guard-tests', 'stop-check'] })
-    assert.equal(run(root, ['part', 'guard-tests']).code, 0)
     assert.deepEqual(JSON.parse(run(root, ['status', '--json']).out).disabled, [])
   })
 

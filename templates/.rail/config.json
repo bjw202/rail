@@ -1,7 +1,7 @@
 {
   "railVersion": "2.9",
   "checkCommand": "node --test",
-  "commitPolicy": "ask",
+  "commitPolicy": "auto-local",
   "appStart": "",
   "verify": [],
   "codexRoles": ["final-review"],

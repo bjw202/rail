@@ -77,7 +77,7 @@ stateDiagram-v2
 | 6. 착수 전 결정과 가정 시험 | 단계 `decide`. 이 마일스톤의 성공 장면들에 적힌 "착수 전" 번호(D-xx 결정, T-xx 시험)를 모읍니다. 결정은 후보를 보이고 사람에게 묻고, 사람이 고르면 리더가 기획서 그 줄을 `결정: 선택함 (…)` 꼴로 고칩니다. 봐야 아는 결정은 시제품(`proto`)을 붙입니다. 가정 시험은 `.rail/trial/template.md` 로 지시서를 쓰고 버리는 코드로 진짜 자료에 해 본 뒤 `시험: 통과 …` 꼴로 적습니다. 다 풀리면 마일스톤을 시작합니다 | `ask … --kind decide`, `answer`, `proto start/record/card/pick`, `advance milestone` | `docs/PLAN.md` "결정과 시험", `docs/decisions/D-xx-*.md`, `.rail/trial/T-xx/`, `.rail/proto/`; `state.json` 의 `gates.risks_decided`, `gates.plan_marks` | 없음 |
 | 7. step 표 | 단계 `milestone`. 리더가 지금 마일스톤의 `docs/plan/Mx.md` 를 씁니다(기본: 줄 하나 = 기능 하나, 마지막 줄은 "마지막 리뷰"). 자율 모드가 아니면 표를 보이고 "이대로 시작할까요?"를 묻습니다. 시작하면 상태 칸에 ⏳ 가 들어갑니다 | `ask … --kind approve`, `step-start M0-1` | `docs/plan/M0.md` 의 "상태" 칸; 사건 `step_start`, 자율이면 `auto_start` | 없음 |
 | 8. 작업자(기능) | 리더가 `.orchestration/M0-1-spec.md` 를 씁니다. `worker start` 가 Orca 창을 고르고(리더 탭을 나누거나 새 탭), 그 창에 `claude --dangerously-skip-permissions …` 를 띄우고, Orca 에 지시서를 맡깁니다. 작업자가 끝나면 Orca 가 리더를 깨우고, 리더가 `worker done` 으로 보고를 읽고 그 창 하나만 닫습니다. `isolation` 이 `worktree` 면 작업자는 자기 git worktree 에서 일하고 `worker done` 이 main 에 합칩니다 | `worker start M0-1 --agent claude --role feature`, `worker done M0-1` | `.orchestration/`; 사건 `worker_start`, `worker_done`, `worker_closed` | 작업자 세션에도 같은 레포 설정의 훅(시험 잠금, 마무리 검사)이 걸립니다 |
-| 9. 커밋 관문 | 리더가 검사 명령(`checkCommand`)을 직접 돌리고, 바뀐 파일이 그 줄의 "고쳐도 되는 파일" 안인지 보고 결과를 기록합니다. 통과하면 커밋 정책대로 사람에게 묻거나(`ask`) 묻지 않고 로컬 커밋합니다 | `part commit`, `log commit_gate '{"step":"M0-1","ok":true}'` | 사건 `commit_gate` | 없음 |
+| 9. 커밋 관문 | 리더가 검사 명령(`checkCommand`)이 통과하고 바뀐 파일이 그 줄의 "고쳐도 되는 파일" 안인지 봅니다. 그러면 커밋 정책대로 그 step 의 파일만 커밋합니다: 시작 틀의 `auto-local` 이면 묻지 않고 로컬 커밋(푸시 안 함), `ask` 면 사람에게 물은 뒤. 따로 남기는 기록은 없습니다 | `git add <그 step 의 파일>`, `git commit` | 없음 | 마무리 검사 훅이 같은 검사 명령을 돌려, 실패한 채로는 세션이 멈추지 못합니다 |
 | 10. 확인 작업자 | 기능을 만들지 않은 새 작업자가 `.rail/check/template.md` 로 채운 지시서를 받아, 완료 기준을 어기는 경우를 찾습니다. 결과는 `.rail/check/M0-1.json`(`must`, `nice`), 재현 시험은 `.rail/check/M0-1/*.test.mjs` 입니다. `must` 가 있으면 리더가 그 기록을 커밋해 잠근 뒤 고침 작업자 `M0-1-fix` 를 띄웁니다 | `worker start M0-1-check --role check`, `worker start M0-1-fix --role fix` | `.rail/check/` | 확인 결과 폴더는 점으로 시작해 `node --test` 가 저절로 돌리지 않으므로 마무리 검사를 막지 않습니다 |
 | 11. step-done | 상태 칸을 `✅ 끝(날짜) <한 줄>` 로 씁니다. 기능 줄이면 확인 기록이 있어야 하고, `must` 가 있었으면 고침 작업자가 닫혀 있어야 합니다(`check.mjs:featureProblems`). 시험 줄이면 지금의 시험 파일을 기준선에 찍어 커밋 전이어도 잠급니다 | `step-done M0-1 --note "<한 줄>" [--commit <해시>]` | `docs/plan/M0.md`, `.rail/test-baseline.json`; 사건 `step_done` | 기준선이 생긴 뒤에는 시험 잠금이 기준선의 파일도 막습니다 |
 | 12. 마지막 리뷰 | 표의 마지막 줄("마지막 리뷰")은 역할 `final-review` 로 읽히고, `codexRoles`(기본 `["final-review"]`)에 있으므로 Codex 로 띄우라고 안내합니다. `codex` 명령이 PATH 에 없으면 `worker start` 가 Claude 로 대신 띄우고 경고와 `codex_missing` 을 남깁니다 | `worker start Mx-N --agent codex --role final-review` | 지시서가 가리키는 `.rail/review/<step>.json` (코드는 읽지 않음, 11절) | 없음 |
@@ -134,7 +134,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 기획서 꼴과 승인 날짜. 사람의 "맞음" 없이 `승인:` 줄을 쓰지 않음 | 빠진 줄을 "다음 할 일"로 알리기만 합니다. `advance decide` 는 기획서가 있는지와 마일스톤 순서만 봅니다 | `docs.mjs:sheetProblems`, `scripts/lib/status.mjs:approveHint` |
 | step 표를 사람이 승인한 뒤 첫 step 시작 | 자율 모드가 아니고 표가 새것이면 묻도록 안내합니다 | `status.mjs:describe` (`fresh`) |
 | 지금 마일스톤 밖의 step 표를 만들지 않음 | "관문 위반 —" 문장으로 알립니다. 막지는 않습니다 | `plan.mjs:planViolations` |
-| 커밋 관문: 검사 명령 통과, 바뀐 파일이 범위 안, 커밋 정책대로 커밋 | 할 일을 문장으로 주고, 리더가 남긴 `commit_gate` 사건을 부품 쓰임으로 셉니다. `step-done` 은 `commit_gate` 기록을 보지 않습니다 | `status.mjs:commitHint`, `scripts/lib/parts.mjs` (`commit`) |
+| 커밋 관문: 검사 명령 통과, 바뀐 파일이 범위 안, 커밋 정책대로 그 step 의 파일만 커밋 | 할 일을 문장으로 주기만 합니다. 기록도 부품도 없습니다(예전의 `commit_gate` 기록은 리더가 스스로 적는 것이라 막을 수 없어 뺐습니다). 실제로 막는 것은 검사 명령을 돌리는 마무리 검사 훅입니다 | `status.mjs:commitHint`, `hooks/stop-check.mjs` |
 | 확인 작업자 지시서에 만든 작업자의 대화·해석을 넣지 않음 | 틀과 안내 문장만 줍니다 | `check.mjs:featureHint`, `templates/.rail/check/template.md` |
 | 마지막 리뷰 지시서에 그 마일스톤의 diff 범위만 넣음, 판정으로 고친 시험 목록을 넣음 | 목록은 안내 문장에 붙여 줍니다 | `status.mjs:startHint`, `skills/rail-milestone/workers.md` |
 | 기획서 "살아 있는 세 줄"을 닫기 전에 고침 | 줄에 그 마일스톤 번호가 없으면 먼저 고치라고 안내합니다. 관문은 아닙니다 | `status.mjs` 의 `livingHint` |
@@ -159,7 +159,16 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 ### 부품과 덜어내기
 
-부품은 "모델이 혼자 못 한다"는 가정 하나하나입니다(`scripts/lib/parts.mjs` 의 `PARTS`). 열두 개가 있습니다: `gate:order`, `gate:close`, `feature-check`, `guard-tests`, `stop-check`, `verify`, `rehearsal`, `commit`, `stop:human`, `stop:busy`, `stop:same_failure`, `stop:budget`. `usage` 명령은 사건 기록에서 부품마다 마일스톤별로 작동 횟수와 막은 횟수를 셉니다. 훅과 멈춤 규칙은 막을 때만 기록하므로 작동 횟수는 "?"로 나옵니다. 보험 부품(기본 `guard-tests`, `stop-check`, `gate:close`)이 아니고 최근 닫힌 마일스톤 세 개 동안 한 번도 막지 않은 부품은 빼기 후보로 뜹니다(`scripts/lib/usage.mjs:usage`). 사람이 끈 부품은 그 마일스톤을 닫을 때 다시 켜집니다.
+부품은 "모델이 혼자 못 한다"는 가정 하나하나입니다(`scripts/lib/parts.mjs` 의 `PARTS`). 열한 개가 있습니다: `gate:order`, `gate:close`, `feature-check`, `guard-tests`, `stop-check`, `verify`, `rehearsal`, `stop:human`, `stop:busy`, `stop:same_failure`, `stop:budget`. `usage` 명령은 사건 기록에서 부품마다 마일스톤별로 작동 횟수와 막은 횟수를 셉니다. 훅과 멈춤 규칙은 막을 때만 기록하므로 작동 횟수는 "?"로 나옵니다.
+
+빼기 후보는 최근 닫힌 마일스톤 세 개 모두에서 일하지 않은 부품입니다(`scripts/lib/usage.mjs:usage`). "일하지 않음"은 부품마다 다르게 봅니다.
+
+- **막는 부품**(`gate:close`, `feature-check`, 훅 둘): 한 번도 막지 않았으면 후보입니다.
+- **증거를 만드는 부품**(`verify`, `rehearsal`, `PARTS` 의 `evidence`): 막지 않아도 돌 때마다 마일스톤의 증거(검증 결과, 리허설 통과 수)를 남기므로, 한 번도 돌지 않았을 때만 후보입니다.
+- **자율 멈춤 규칙**(`stop:*`, `PARTS` 의 `auto`): 그 마일스톤 동안 자율 모드가 꺼져 있었으면 일할 기회가 없었으므로 표에 "잴 수 없음"으로 보이고 후보가 되지 않습니다. 켜져 있었는지는 사건 기록으로 판단합니다(`usage.mjs:buckets`): `autonomy.mode` 를 바꾼 `policy_change` 를 차례로 따라가고(처음 값은 첫 바꿈의 `from`, 바꾼 적이 없으면 지금 config 값), 그 마일스톤에 `auto_start` 가 있으면 켜진 것으로 봅니다. `autonomy_stop` 은 판단에 쓰지 않습니다. 자율 모드가 꺼져 있어도 `next` 를 부르면 `human` 같은 까닭이 남기 때문입니다(7절).
+- **빼지 않는 부품**: 보험 부품(기본 `guard-tests`, `stop-check`, `gate:close`)과 순서 검사 `gate:order`(`fixed`, 끌 것이 없음), 그 세 마일스톤 동안 꺼 보았던 부품은 후보로 보지 않습니다.
+
+사람이 끈 부품은 그 마일스톤을 닫을 때 다시 켜집니다. 예전 기록에 남은 `commit_gate` 사건이나 config 의 `disabled` 에 적힌 `commit` 은 모르는 이름이라 그냥 무시합니다.
 
 ## 4. 모듈 지도
 
@@ -169,7 +178,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 | 파일 | 줄 | 하는 일 | 부르는 것 |
 |---|---|---|---|
-| `scripts/rail.mjs` | 70 | 명령 이름을 받아 `lib/` 의 함수로 넘기는 입구입니다. 상태를 고치는 명령은 명령 전체가 잠금을 잡게 하고, 작업 중 표시(`busy`)와 레일 크기 기록을 갱신합니다 | 모든 레일 명령 |
+| `scripts/rail.mjs` | 69 | 명령 이름을 받아 `lib/` 의 함수로 넘기는 입구입니다. 상태를 고치는 명령은 명령 전체가 잠금을 잡게 하고, 작업 중 표시(`busy`)와 레일 크기 기록을 갱신합니다 | 모든 레일 명령 |
 | `scripts/install.mjs` | 147 | 레포 하나에 레일을 설치하고 업데이트합니다(8절) | `rail-install`, `node scripts/install.mjs <레포>` |
 
 ### `scripts/lib/*.mjs`
@@ -188,7 +197,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `gates.mjs` | 88 | 단계 순서 검사, 닫기 관문, step 시작·끝 관문입니다 | `check`, `advance`, `step-start`, `step-done` |
 | `log.mjs` | 22 | 손으로 남기는 사건 한 줄입니다. `worker_*` 를 손으로 쓰면 경고합니다 | `log` (훅도 이것을 부릅니다) |
 | `orca.mjs` | 50 | Orca CLI 부르기를 한 곳에 모읍니다. Windows 의 `orca.cmd` 를 안전하게 부르는 길이 여기 있습니다 | `worker`, `proto`, `next`, `advance close`(알림) |
-| `parts.mjs` | 39 | 부품 목록, 보험, 꺼 둔 부품입니다 | `usage`, `part`, `policy`, 관문들 |
+| `parts.mjs` | 39 | 부품 목록, 보험, 꺼 둔 부품입니다 | `usage`, `policy`, 관문들 |
 | `plan.mjs` | 171 | step 표 `docs/plan/Mx.md` 를 읽고, 표 검사·시작 가능한 step·상태 칸 쓰기를 합니다 | `step-start`, `step-done`, `worker`, `status`, `plan approve`, `advance close` |
 | `policy.mjs` | 67 | 사람만 바꾸는 정책(커밋, 자율, `isolation`, 부품 끄고 켜기)입니다 | `policy` |
 | `proto.mjs` | 296 | 시식용 시제품: 변주마다 새 작업 공간에 작업자를 띄우고, 결과를 카드와 비교 페이지로 묶고, 고른 화면을 기준 화면으로 옮깁니다 | `proto`, `status`(결정 단계 안내) |
@@ -199,7 +208,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `state.mjs` | 176 | 상태 파일, 파일 잠금, 사건 기록, 작업 중 표시입니다 | 모든 명령, `install.mjs`(진행 중 검사) |
 | `status.mjs` | 246 | 위치와 "다음 할 일" 문장을 만듭니다. 절차의 원본이 이 파일입니다 | `status`, `precompact`, `next` |
 | `steps.mjs` | 86 | step 시작과 끝입니다 | `step-start`, `step-done` |
-| `usage.mjs` | 106 | 부품 쓰임 세기, 빼기 후보, 레일 크기 기록입니다 | `usage`, `part`, 모든 명령(크기 기록), `advance close` |
+| `usage.mjs` | 104 | 부품 쓰임 세기, 빼기 후보, 레일 크기 기록입니다 | `usage`, 모든 명령(크기 기록), `advance close` |
 | `verify.mjs` | 58 | 바깥 정답 검증기를 돌리고, 장면 질문 앞에서 그 기록을 봅니다 | `verify`, 장면 관문 |
 | `workers.mjs` | 249 | 작업자 창 고르기·띄우기·닫기, 열린 작업자 읽기, 시험 고치기 허락입니다 | `worker`, 그리고 열린 작업자를 보는 거의 모든 곳 |
 | `worktree.mjs` | 132 | 작업자마다 git worktree 만들기·합치기·지우기입니다 | `worktree`, `worker`, `step-done`, `advance close`, `install.mjs`(커밋 안 된 변경 검사) |
@@ -281,7 +290,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `proto_record` / `proto_card` / `proto_picked` | 시제품 변주 기록, 카드에 붙임, 고름과 정리 | `proto.mjs` |
 | `hook_blocked` | 시험 잠금 훅이 막음 | `hooks/guard-tests.mjs` (`rail.mjs log` 를 부름) |
 | `hook_held` | 마무리 검사 훅이 멈춤을 붙잡음 | `hooks/stop-check.mjs` (`rail.mjs log` 를 부름) |
-| `commit_gate` | 커밋 관문 결과(`ok`, `why`) | 리더가 `log commit_gate '…'` 로 남김 |
+| `commit_gate` | (예전 기록) 커밋 관문 결과. 이제는 남기라고 안내하지 않고, 기록에 있어도 아무 코드도 읽지 않습니다 | 예전에 리더가 `log commit_gate '…'` 로 남김 |
 
 코드가 읽기만 하는 이름이 둘 있습니다. `rail_edit` 은 닫힘 알림이 "레일 수정 N번"으로 세고(`advance.mjs:closeSummary`), `rail_gap` 은 압축 지시가 최근 세 개를 싣습니다(`status.mjs:cmdPrecompact`). `templates/docs/RAIL.md` 가 `rail_edit` 기록을 말하지만, 이 둘을 남기는 코드나 스킬 문장은 코드에서 확인 못 했습니다. 리더가 `log` 명령으로 남기는 것으로 보입니다.
 
@@ -294,10 +303,10 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 칸 | 읽는 코드 |
 |---|---|
 | `railVersion` | `config.mjs:railVersion` — `status` 머리, 훅 머리, `rail_size` |
-| `checkCommand` | `hooks/stop-check.mjs:readCommand`. 커밋 관문에서는 리더가 직접 돌립니다 |
+| `checkCommand` | `hooks/stop-check.mjs:readCommand`. 리더도 커밋 전에 통과하는지 봅니다 |
 | `verify` (`name`, `command`, `why`, `timeoutSec`) | `config.mjs:verifiers`, `verify.mjs:cmdVerify`(한 개당 기본 900초) |
 | `appStart` | 코드는 읽지 않습니다. 확인 지시서 틀과 `rail-check` 스킬이 작업자에게 이 명령으로 앱을 띄우라고 합니다 |
-| `commitPolicy` | `config.mjs:commitPolicy` — 커밋 안내, 자율 모드 |
+| `commitPolicy` | `config.mjs:commitPolicy` — 커밋 안내, 자율 모드. 시작 틀은 `auto-local`, 칸이 없으면 `ask` 로 봅니다. `auto-local` 이어도 자율 모드는 `autonomy.mode` 가 따로 정합니다 |
 | `isolation`, `worktreeDir` | `config.mjs:isolation`, `worktree.mjs:wtDir` |
 | `codexRoles` | `status.mjs:startHint` — 어떤 역할을 `--agent codex` 로 안내할지 |
 | `staleTests` | `stale.mjs:staleMode` |
@@ -374,7 +383,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 6 | `budget` / `error` | 12 / 15 | 위에서 멈추지 않았을 때만(또는 `--budget`) 비용 명령을 불러 잽니다. 넘으면 `budget`, 비용 명령이 실패하면 `error`. 비용 명령이 비어 있으면 예산 규칙을 쓰지 않습니다 |
 | — | (할 일 있음) | 0 | 멈출 까닭 없음 |
 
-`human`, `busy`, `same_failure`, `budget` 넷은 부품(`stop:<까닭>`)이라 사람이 끌 수 있고, 꺼져 있으면 멈추지 않고 `part_disabled` 를 남깁니다. 멈춤 까닭이 바뀔 때만 `autonomy_stop` 을 남기므로 30분마다 불러도 기록이 쌓이지 않습니다.
+`human`, `busy`, `same_failure`, `budget` 넷은 부품(`stop:<까닭>`)이라 사람이 끌 수 있고, 꺼져 있으면 멈추지 않고 `part_disabled` 를 남깁니다. 자율 모드가 꺼져 있던 마일스톤에서는 이 넷을 "잴 수 없음"으로 보고 빼기 후보에 올리지 않습니다(3절 "부품과 덜어내기"). 멈춤 까닭이 바뀔 때만 `autonomy_stop` 을 남기므로 30분마다 불러도 기록이 쌓이지 않습니다.
 
 **예산 규칙 셋**(`budget.mjs:budgetStatus`): 마지막 진척 뒤 지출(진척 = `step_done`, `stage_advance`, `milestone_closed`, `scene_check`, 또는 마무리 검사가 본 시험 통과 수가 늘어난 때), 지난 마일스톤 비용 중간값의 몇 배, 하루 상한입니다. 비용 명령은 표준 입력 `{"intervals":[{"from","to"}]}` 를 받아 45초 안에 `{"usd":[…]}` 를 내야 합니다.
 
@@ -418,26 +427,26 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 ## 10. 크기
 
-이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-26, 커밋 f6551bb 기준).
+이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-26, 커밋 관문 기록을 뺀 덜어내기 뒤).
 
 | 묶음 | 파일 | 줄 |
 |---|---|---|
-| 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,901 (입구 70, 모듈 2,831) |
+| 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,898 (입구 69, 모듈 2,829) |
 | 레일 실행 코드: 훅 | `hooks/*.mjs` 4개 | 508 |
-| 레일 실행 코드 합 | | **3,409** |
+| 레일 실행 코드 합 | | **3,406** (덜어내기 전 3,409) |
 | 설치 도구 | `scripts/install.mjs` | 147 |
 | 스킬 | `skills/*/*.md` 5개 | 140 |
-| 시작 틀 | `templates/` 8개(`docs/RAIL.md` 37줄 포함) | 220 |
-| 시험 | `tests/*.mjs` 22개(시험 파일 21개와 도우미) | 4,122 |
+| 시작 틀 | `templates/` 8개(`docs/RAIL.md` 38줄 포함) | 221 |
+| 시험 | `tests/*.mjs` 23개(시험 파일 22개와 도우미) | 4,264 |
 
-시험 수는 256개이고, 맥에서 `npm test` 를 돌리면 255개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
+시험 수는 265개이고, 맥에서 `npm test` 를 돌리면 264개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
 
 ## 11. 코드가 보지 않는 것
 
 코드를 읽으며 확인한, 관문이 일부러 또는 아직 보지 않는 자리입니다. 고칠 것인지는 사람이 정합니다.
 
 - **기획서 승인.** `advance decide` 는 기획서가 있고 마일스톤 순서가 맞는지만 봅니다. `승인:` 줄이 없어도 넘어갑니다(`gates.mjs` 의 주석이 이것을 "다음 할 일"이 알려 준다고 밝힙니다).
-- **커밋 관문.** `step-done` 은 `commit_gate` 기록이나 커밋 여부를 보지 않습니다. 커밋 관문은 리더가 지키는 안내입니다.
+- **커밋 관문.** `step-done` 은 커밋 여부를 보지 않고, 커밋 관문은 기록도 남기지 않는 안내입니다. 코드가 막는 것은 마무리 검사 훅이 검사 명령을 돌리는 데까지입니다. 바뀐 파일이 "고쳐도 되는 파일" 안인지는 리더가 봅니다.
 - **리뷰 결과.** 리뷰·마지막 리뷰 작업자가 쓰는 `.rail/review/<step>.json` 을 읽는 코드가 없습니다. 스킬이 가리키는 `.rail/review/calibration.md` 를 만드는 틀도 없습니다.
 - **step 표가 아예 없을 때.** `advance check` 는 빈 표만 막고 파일이 없는 경우는 보지 않습니다(닫기 관문에서는 막힙니다).
 - **표 검사.** 칸 수·겹친 step·기다림 순서 같은 표 문제는 `status` 가 알리고 닫기 관문과 미리 승인이 막지만, `step-start`·`step-done` 은 보지 않습니다.

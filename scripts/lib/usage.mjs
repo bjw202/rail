@@ -1,23 +1,27 @@
 // 부품 쓰임 세기, 빼기 후보, 레일 크기.
 import fs from 'node:fs'
 import path from 'node:path'
-import { railVersion, versionLabel } from './config.mjs'
-import { F, ROOT, fail, out, walk } from './core.mjs'
-import { PARTS, PART_IDS, disabledParts, insurance, partOff, partSkipped, writeDisabled } from './parts.mjs'
+import { autonomy, railVersion, versionLabel } from './config.mjs'
+import { F, ROOT, out, walk } from './core.mjs'
+import { PARTS, PART_IDS, disabledParts, insurance, writeDisabled } from './parts.mjs'
 import { appendLog, loadState, lock, readEvents, unlock } from './state.mjs'
 
-
 // 사건을 마일스톤으로 나눈다: 사건에 적힌 마일스톤, 없으면(시작 전, 닫힌 뒤 다음 결정 전) 그 뒤에 처음 닫힌 마일스톤, 그것도 없으면 지금 마일스톤.
+// auto: 그 마일스톤 동안 자율 모드가 켜져 있었는가. autonomy.mode 의 policy_change 를 차례로 따라간다(처음 값은 첫 바꿈의 from, 바꾼 적이 없으면 지금 config). auto_start 가 있어도 켜짐.
 export function buckets(st, ev) {
   const map = new Map()
   const closeAt = ev.map((e, i) => (e.event === 'milestone_closed' ? i : -1)).filter((i) => i >= 0)
+  const isMode = (e) => e.event === 'policy_change' && e.key === 'autonomy.mode'
+  let mode = ev.find(isMode)?.from ?? autonomy().mode
   let c = 0
   ev.forEach((e, i) => {
     while (c < closeAt.length && closeAt[c] < i) c++
     const id = e.milestone ?? (c < closeAt.length ? ev[closeAt[c]].milestone : st.milestone ?? '다음')
-    if (!map.has(id)) map.set(id, { id, events: [], closed: false })
+    if (!map.has(id)) map.set(id, { id, events: [], closed: false, auto: false })
     const b = map.get(id)
     b.events.push(e)
+    if (isMode(e)) mode = e.to
+    if (mode === 'on' || e.event === 'auto_start') b.auto = true
     if (e.event === 'milestone_closed') b.closed = true
   })
   // 마지막으로 닫은 뒤의 사건(다음 마일스톤 전)은 세지 않는다.
@@ -34,15 +38,17 @@ export function usage(st = loadState(), ev = readEvents()) {
     disabled: off.includes(p.id),
     counts_ran: Boolean(p.ran),
     by: Object.fromEntries(
-      bs.map((b) => [b.id, { ran: p.ran ? b.events.filter(p.ran).length : null, blocked: b.events.filter(p.blocked).length, off: b.events.filter((e) => e.event === 'part_disabled' && e.part === p.id).length }])
+      bs.map((b) => [b.id, { ran: p.ran ? b.events.filter(p.ran).length : null, blocked: b.events.filter(p.blocked).length, off: b.events.filter((e) => e.event === 'part_disabled' && e.part === p.id).length, ...(p.auto && !b.auto ? { unmeasured: true } : {}) }])
     )
   }))
-  // 빼기 후보: 보험이 아니고, 최근 닫힌 마일스톤 3개 동안 한 번도 막지 않은 부품. 그동안 꺼 보았던 부품은 0 이 증거가 아니므로 뺀다.
+  // 빼기 후보: 최근 닫힌 마일스톤 3개 모두에서 일하지 않은 부품. 막는 부품은 한 번도 막지 않았을 때, 증거를 만드는 부품(evidence)은 한 번도 돌지 않았을 때.
+  // 보험, 순서 검사(fixed), 자율 모드가 꺼져 있어 잴 수 없던 멈춤 규칙, 그동안 꺼 보았던 부품(0 이 증거가 아님)은 뺀다.
   const win = bs.filter((b) => b.closed).slice(-3)
   const touched = (id) => win.some((b) => b.events.some((e) => e.part === id && ['part_disabled', 'policy_change', 'part_enabled'].includes(e.event)))
-  const list = win.length < 3 ? [] : parts.filter((p) => !p.insurance && !touched(p.id) && win.every((b) => p.by[b.id].blocked === 0)).map((p) => p.id)
-  const why = win.length < 3 ? `닫힌 마일스톤이 ${win.length}개라 아직 뽑지 않습니다. 3개부터 뽑습니다` : `보험이 아니고 ${win.map((b) => b.id).join('·')} 동안 한 번도 막지 않음`
-  return { milestones: bs.map((b) => ({ id: b.id, closed: b.closed })), parts, candidates: { list, window: win.map((b) => b.id), why }, disabled: off, insurance: ins }
+  const idle = (p, x) => !x.unmeasured && (p.evidence ? x.ran === 0 : x.blocked === 0)
+  const list = win.length < 3 ? [] : PARTS.filter((p, i) => !parts[i].insurance && !p.fixed && !touched(p.id) && win.every((b) => idle(p, parts[i].by[b.id]))).map((p) => p.id)
+  const why = win.length < 3 ? `닫힌 마일스톤이 ${win.length}개라 아직 뽑지 않습니다. 3개부터 뽑습니다` : `최근 닫힌 ${win.map((b) => b.id).join('·')} 에서 막는 부품은 한 번도 안 막았고, 검증기·리허설은 한 번도 안 돈 것. 보험·순서 검사·잴 수 없는 멈춤 규칙은 보지 않음`
+  return { milestones: bs.map((b) => ({ id: b.id, closed: b.closed, autonomy: b.auto })), parts, candidates: { list, window: win.map((b) => b.id), why }, disabled: off, insurance: ins }
 }
 export const candidateLine = (c) => `빼기 후보: ${c.list.length ? c.list.join(', ') : '없음'} (${c.why})`
 export function cmdUsage({ flags }) {
@@ -54,23 +60,15 @@ export function cmdUsage({ flags }) {
   for (const p of u.parts) {
     const cells = u.milestones.map((m) => {
       const x = p.by[m.id]
-      return `${x.ran ?? '?'}/${x.blocked}${x.off ? ` 꺼짐${x.off}` : ''}`.padEnd(10)
+      return (x.unmeasured ? '잴 수 없음' : `${x.ran ?? '?'}/${x.blocked}${x.off ? ` 꺼짐${x.off}` : ''}`).padEnd(10)
     })
     lines.push(`${p.id.padEnd(18)} ${cells.join(' ')} ${p.name}${p.insurance ? ' [보험]' : ''}${p.disabled ? ' [지금 꺼짐]' : ''}`)
   }
-  lines.push('작동 "?" = 막을 때만 기록하는 부품이라 작동 횟수는 세지 않습니다. "꺼짐n" = 꺼져 있어 건너뛴 횟수(part_disabled).')
+  lines.push('칸은 "돈 횟수/막은 횟수"입니다. "?" 는 막을 때만 기록하는 부품이라 돈 횟수를 모른다는 뜻, "꺼짐n" 은 꺼 두어 n번 건너뛰었다는 뜻입니다.')
+  lines.push('"잴 수 없음" 은 그 마일스톤에 자율 모드가 꺼져 있어 멈춤 규칙이 일할 기회가 없었다는 뜻이라 빼기 후보로 보지 않습니다. 검증기와 리허설은 막기보다 증거를 만드는 부품이라, 돌았으면 후보가 아닙니다.')
   lines.push(candidateLine(u.candidates))
   if (u.disabled.length) lines.push(`꺼 둔 부품: ${u.disabled.join(', ')}`)
   out(lines.join('\n'))
-}
-// 부품 하나가 켜졌는지 스크립트 밖(스킬의 커밋 관문)에서 묻는다. 꺼져 있으면 part_disabled 를 남기고 종료 코드 1.
-export function cmdPart({ pos }) {
-  const id = pos[0]
-  if (!PART_IDS.includes(id)) fail(`사용법: part <${PART_IDS.join('|')}>`, 2)
-  if (!partOff(id)) return out(`[부품] ${id} 켜짐`)
-  partSkipped(id, loadState(), { where: 'part' })
-  out(`[부품] ${id} 꺼짐 — 이 마일스톤 동안 건너뜁니다 (policy set disable)`)
-  process.exitCode = 1
 }
 // 마일스톤을 닫은 뒤: 빼기 후보를 알리고, 꺼 둔 부품을 다시 켠다.
 export function afterClose(st, id, off) {

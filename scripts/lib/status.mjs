@@ -30,11 +30,11 @@ export function startHint(row) {
   return `명세 .orchestration/${row.step}-spec.md 를 쓰고 worker start ${row.step} --agent ${codex ? 'codex' : 'claude'} --role ${role} (Orca 가 없으면 하위 에이전트에 같은 명세를 주고 log worker_start)${stale}`
 }
 export function commitHint(row, step = row.step) {
-  if (isolated(roleFlag(row)))
-    return `커밋 관문(worktree): 작업자가 브랜치 rail/${step} 에 커밋했는지(git log HEAD..rail/${step}), ${wtDir(step)} 에서 checkCommand 가 통과하는지, 바뀐 파일(git diff --name-only HEAD...rail/${step})이 "고쳐도 되는 파일" 안인지 보고 log commit_gate '{"step":"${row.step}","ok":true}'(막히면 "ok":false 로 남기고 작업자 브랜치에서 고치게). 리더는 커밋하지 않는다`
-  const pol = commitPolicy() === 'auto-local' ? '묻지 않고 로컬 커밋(푸시 안 함)' : '사람에게 커밋할지 묻기'
+  const scope = `바뀐 파일이 이 step 의 "고쳐도 되는 파일" 안${isImplRole(row) ? '(tests/·fixtures/ 변경 없음)' : ''}`
+  if (isolated(roleFlag(row))) return `커밋 관문(worktree): 작업자가 브랜치 rail/${step} 에 커밋했고 ${wtDir(step)} 에서 checkCommand 가 통과하고 ${scope}(git diff --name-only HEAD...rail/${step})인지 본다. 아니면 작업자 브랜치에서 고치게. 리더는 커밋하지 않는다`
+  const pol = commitPolicy() === 'auto-local' ? '묻지 않고 로컬 커밋(푸시 안 함)' : '사람에게 물은 뒤 커밋'
   const test = isTestRole(row) ? ' 시험 step 은 짝 구현 전이라 checkCommand 가 통과가 아니므로 커밋하지 않는다.' : ''
-  return `커밋 관문: part commit 이 켜짐이면 checkCommand 를 직접 돌려 통과·바뀐 파일이 이 step 의 "고쳐도 되는 파일" 안${isImplRole(row) ? '이고 tests/·fixtures/ 변경 없음' : ''}인지 보고 log commit_gate '{"step":"${row.step}","ok":true}'(막히면 "ok":false,"why":"<한 줄>") → 통과하면 커밋 정책대로 ${pol}, 이 step 의 파일만 git add.${test}`
+  return `커밋 관문: checkCommand 가 통과하고(마무리 검사 훅도 본다) ${scope}이면 커밋 정책대로 이 step 의 파일만 ${pol}.${test}`
 }
 // 작업자가 끝난 뒤의 차례. worktree 방식이면 커밋 관문을 그 worktree 에서 먼저 하고, worker done 이 합치고 지운다.
 export const afterWorker = (row, step = row.step) => (isolated(roleFlag(row)) ? `${commitHint(row, step)} → worker done ${step} (main 에 합치고 worktree 를 지운다)` : `worker done ${step} → ${commitHint(row)}`)

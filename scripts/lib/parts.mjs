@@ -8,6 +8,7 @@ import { appendLog } from './state.mjs'
 // ---------- 덜어내기: 부품 쓰임 세기와 끄기 ----------
 // 부품 하나하나는 "모델이 혼자 못 한다"는 가정이다. 부품마다 마일스톤별로 작동(돈 횟수)과 막음(실제로 멈추거나 바꾼 횟수)을 사건 기록에서 센다.
 // ran 이 null 인 부품은 막을 때만 기록하므로 작동을 세지 않는다(훅, 멈춤 규칙). 부품을 빼는 것은 사람이 정한다.
+// evidence: 막기보다 증거를 만드는 부품이라 빼기 후보를 작동으로 본다. auto: 자율 모드가 켜져 있어야 일하는 멈춤 규칙.
 export const gateEv = (e, ...targets) => (e.event === 'gate_passed' || e.event === 'gate_blocked') && targets.includes(e.target)
 export const ORDER_TARGETS = ['decide', 'milestone', 'check', 'step-done']
 export const PARTS = [
@@ -17,10 +18,9 @@ export const PARTS = [
   { id: 'feature-check', name: '기능 확인 (확인 기록 없이 기능 step 을 끝내지 않음)', ran: (e) => gateEv(e, 'feature-check'), blocked: (e) => e.event === 'gate_blocked' && e.target === 'feature-check' },
   { id: 'guard-tests', name: '시험 잠금 훅', ran: null, blocked: (e) => e.event === 'hook_blocked' },
   { id: 'stop-check', name: '마무리 검사 훅 (붙잡음)', ran: null, blocked: (e) => e.event === 'hook_held' },
-  { id: 'verify', name: '검증기', ran: (e) => e.event === 'verify_run', blocked: (e) => e.event === 'verify_run' && e.ok === false },
-  { id: 'rehearsal', name: '장면 리허설 관문', ran: (e) => gateEv(e, 'scene', 'rehearsal-record'), blocked: (e) => e.event === 'gate_blocked' && ['scene', 'rehearsal-record'].includes(e.target) },
-  { id: 'commit', name: '커밋 관문', ran: (e) => e.event === 'commit_gate', blocked: (e) => e.event === 'commit_gate' && e.ok === false },
-  ...['human', 'busy', 'same_failure', 'budget'].map((c) => ({ id: `stop:${c}`, name: `자율 멈춤 규칙 (${c})`, ran: null, blocked: (e) => e.event === 'autonomy_stop' && e.code === c }))
+  { id: 'verify', evidence: true, name: '검증기', ran: (e) => e.event === 'verify_run', blocked: (e) => e.event === 'verify_run' && e.ok === false },
+  { id: 'rehearsal', evidence: true, name: '장면 리허설 관문', ran: (e) => gateEv(e, 'scene', 'rehearsal-record'), blocked: (e) => e.event === 'gate_blocked' && ['scene', 'rehearsal-record'].includes(e.target) },
+  ...['human', 'busy', 'same_failure', 'budget'].map((c) => ({ id: `stop:${c}`, auto: true, name: `자율 멈춤 규칙 (${c})`, ran: null, blocked: (e) => e.event === 'autonomy_stop' && e.code === c }))
 ]
 export const PART_IDS = PARTS.map((p) => p.id)
 export const FIXED = PARTS.filter((p) => p.fixed).map((p) => p.id)
