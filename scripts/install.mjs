@@ -40,15 +40,17 @@ const real = (f) => {
 }
 const list = (dir, rel = '') => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? list(path.join(dir, e.name), `${rel}${e.name}/`) : [`${rel}${e.name}`])) : [])
 
-// 설치할 파일: [원본 절대 경로, 대상 상대 경로]. 레일 파일과 없을 때만 만드는 시작 틀로 나눈다.
+// 설치할 파일: [원본 절대 경로, 대상 상대 경로]. 레일 파일(틀 다섯·docs/RAIL.md 포함, 늘 새로 씀)과 없을 때만 만드는 시작 틀(설정·CLAUDE.md)로 나눈다.
+const SEED_ONLY = ['.rail/config.json', 'CLAUDE.md']
 function plan() {
+  const tpl = list(path.join(SRC, 'templates')).filter((f) => f !== '.gitignore').map((f) => [path.join(SRC, 'templates', f), f])
   const own = [
     ...list(path.join(SRC, 'scripts')).filter((f) => f !== 'install.mjs').map((f) => [path.join(SRC, 'scripts', f), `.rail/bin/${f}`]),
     ...list(path.join(SRC, 'hooks')).filter((f) => f.endsWith('.mjs')).map((f) => [path.join(SRC, 'hooks', f), `.rail/hooks/${f}`]),
-    ...list(path.join(SRC, 'skills')).map((f) => [path.join(SRC, 'skills', f), `.claude/skills/${f}`])
+    ...list(path.join(SRC, 'skills')).map((f) => [path.join(SRC, 'skills', f), `.claude/skills/${f}`]),
+    ...tpl.filter(([, rel]) => !SEED_ONLY.includes(rel))
   ]
-  const seed = list(path.join(SRC, 'templates')).filter((f) => f !== '.gitignore').map((f) => [path.join(SRC, 'templates', f), f])
-  return { own, seed }
+  return { own, seed: tpl.filter(([, rel]) => SEED_ONLY.includes(rel)) }
 }
 // .claude/settings.json 의 hooks 에서 레일 훅만 빼고 다시 넣는다. 다른 훅과 설정은 그대로 둔다.
 export function mergeSettings(s) {

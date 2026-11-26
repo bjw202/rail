@@ -109,10 +109,10 @@ describe('설치', () => {
     assert.match(GIT_BASH_WARNING, /Git for Windows 를 깔기를 권합니다: 없으면 Claude Code 가 Bash 도구 대신 PowerShell 을 씁니다/)
   })
 
-  test('업데이트는 레일 파일만 새로 쓰고, 상태·기록·기획서·설정과 고친 시작 틀은 덮지 않으며, 레일에서 빠진 파일은 지운다', () => {
+  test('업데이트는 레일 파일·레일 틀·docs/RAIL.md 를 새 판으로 쓰고, 상태·기록·기획서·설정·CLAUDE.md 는 덮지 않으며, 레일에서 빠진 파일은 지운다', () => {
     const root = repo()
     install(root)
-    for (const [f, body] of [['.rail/state.json', '{"stage":"milestone"}'], ['.rail/log.jsonl', '{}\n'], ['docs/PLAN.md', '# 내 기획서\n'], ['.rail/config.json', '{"checkCommand":"npm test"}'], ['docs/RAIL.md', '내가 고친 설명서\n']]) put(root, f, body)
+    for (const [f, body] of [['.rail/state.json', '{"stage":"milestone"}'], ['.rail/log.jsonl', '{}\n'], ['docs/PLAN.md', '# 내 기획서\n'], ['.rail/config.json', '{"checkCommand":"npm test"}'], ['CLAUDE.md', '# 내 메모\n'], ['docs/RAIL.md', '옛 판 설명서\n'], ['.rail/plan/template.md', '옛 판 기획서 틀\n'], ['.rail/check/template.md', '옛 판 확인 틀\n']]) put(root, f, body)
     put(root, '.rail/bin/lib/core.mjs', '// 낡은 판\n')
     put(root, '.rail/bin/cost.mjs', '// 프로젝트의 비용 명령\n')
     const info = JSON.parse(read(root, '.rail/installed.json'))
@@ -125,7 +125,9 @@ describe('설치', () => {
     assert.match(r.out, /지움 \.rail\/bin\/lib\/old\.mjs/)
     assert.ok(!existsSync(path.join(root, '.rail/bin/lib/old.mjs')))
     assert.equal(read(root, '.rail/bin/cost.mjs'), '// 프로젝트의 비용 명령\n', '설치 목록에 없던 파일은 지우지 않는다')
-    for (const [f, body] of [['.rail/state.json', '{"stage":"milestone"}'], ['docs/PLAN.md', '# 내 기획서\n'], ['.rail/config.json', '{"checkCommand":"npm test"}'], ['docs/RAIL.md', '내가 고친 설명서\n']]) assert.equal(read(root, f), body, f)
+    for (const [f, body] of [['.rail/state.json', '{"stage":"milestone"}'], ['docs/PLAN.md', '# 내 기획서\n'], ['.rail/config.json', '{"checkCommand":"npm test"}'], ['CLAUDE.md', '# 내 메모\n']]) assert.equal(read(root, f), body, f)
+    for (const f of ['docs/RAIL.md', '.rail/plan/template.md', '.rail/check/template.md']) assert.equal(read(root, f), readFileSync(path.join(ROOT, 'templates', f), 'utf8'), `${f} 는 새 판`)
+    assert.match(read(root, '.rail/plan/template.md'), /## 나중에/)
   })
 
   test('CLAUDE.md 는 없으면 15줄 안쪽 틀로 만들고, 안내대로 커밋하면 다시 설치해도 막히지 않으며, 채운 뒤에도 바꾸지 않는다', () => {

@@ -177,13 +177,13 @@ cd C:\projects\my-app; rail-install
 
 긴 명령(`node ~/tools/rail/scripts/install.mjs ~/projects/my-app`)도 그대로 됩니다.
 
-- **바뀌는 것:** `.rail/bin/`, `.rail/hooks/`, `.claude/skills/rail*/` 의 레일 파일, `.claude/settings.json` 의 레일 훅 줄, `.rail/installed.json`. 지난 판에만 있던 레일 파일은 지웁니다(설치 목록에 있던 것만 지우므로 `.rail/bin/` 에 직접 둔 비용 명령 같은 파일은 남습니다).
-- **안 바뀌는 것:** `.rail/config.json`, 시작 틀, `docs/RAIL.md`, `CLAUDE.md`, 상태와 기록, 기획서와 step 표.
+- **바뀌는 것:** `.rail/bin/`, `.rail/hooks/`, `.claude/skills/rail*/` 의 레일 파일, 레일 틀 다섯 개(`.rail/plan/`·`trial/`·`check/` 둘·`proto/` 의 `template.md`)와 사용법 `docs/RAIL.md`, `.claude/settings.json` 의 레일 훅 줄, `.rail/installed.json`. 지난 판에만 있던 레일 파일은 지웁니다(설치 목록에 있던 것만 지우므로 `.rail/bin/` 에 직접 둔 비용 명령 같은 파일은 남습니다).
+- **안 바뀌는 것:** `.rail/config.json`, `CLAUDE.md`, 상태와 기록, 기획서와 step 표. 레일 틀과 `docs/RAIL.md` 는 레일이 쓰는 글이라 고쳐 두어도 새 판으로 덮입니다. 프로젝트 규칙은 `CLAUDE.md` 에 둡니다.
 - 다시 돌렸는데 바뀐 것이 없으면 "바뀐 파일 없음"이 나옵니다. 두 번 돌려도 훅이 두 번 들어가지 않습니다.
 - 이미 레일을 쓰는 레포(`.rail/installed.json` 이나 `.rail/state.json` 이 있는 레포)에 커밋 안 된 변경이 있거나 작업자가 도는 중이면, 업데이트하지 않고 까닭을 보여 줍니다. 커밋 안 된 변경에는 새 파일도 들고, 레일 기록(`.rail/state.json`, `.rail/log.jsonl`, `.rail/test-baseline.json`)과 step 표 폴더(`docs/plan/`)는 뺍니다. 먼저 커밋하거나 작업자가 끝나기를 기다린 뒤 다시 칩니다. 그 상태를 알고도 꼭 지금 바꿔야 할 때만(예: 레일 고장 때문에 작업자를 닫을 수 없을 때) `rail-install --force` 를 씁니다.
 - `.claude/settings.json` 이 깨져 있으면(주석, 끝 쉼표 등) 아무 파일도 쓰지 않고 멈춥니다. 고친 뒤 다시 칩니다.
 - 바뀐 파일이 있으면 마지막 줄에 따로 커밋하라는 안내가 나옵니다: `git add .rail .claude docs/RAIL.md CLAUDE.md .gitignore` 를 한 뒤 `git commit -m "rail 업데이트"`. 제품 작업과 섞지 않으면 나중에 무엇이 레일 때문에 바뀌었는지 가려 보기 쉽습니다.
-- 시작 틀이나 `docs/RAIL.md` 를 새 판으로 바꾸고 싶으면 그 파일을 지운 뒤 설치를 다시 돌립니다.
+- `.rail/config.json` 이나 `CLAUDE.md` 를 새 틀로 바꾸고 싶으면 그 파일을 지운 뒤 설치를 다시 돌립니다.
 
 ## 7. 명령
 
@@ -347,7 +347,7 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
 | `scripts/install.mjs` | 설치·업데이트 도구. `npm link` 하면 `rail-install` 명령이 됨(제품 레포에는 깔리지 않음) |
 | `hooks/*.mjs` | 훅. 설치하면 `.rail/hooks/` 로 갑니다 |
 | `skills/rail*/` | 스킬. 설치하면 `.claude/skills/` 로 갑니다 |
-| `templates/` | 시작 틀. 설치할 때 없는 것만 만듭니다 |
+| `templates/` | 레일 틀·`docs/RAIL.md`(설치 때마다 새 판), 설정·`CLAUDE.md`(없을 때만) |
 | `examples/tiny/` | 아주 작은 예제 프로젝트 |
 | `tests/` | 레일 시험 |
 | `reports/` | 작업 보고서 |

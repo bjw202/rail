@@ -401,8 +401,8 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 1. **대상 확인.** 인자가 없으면 지금 폴더입니다. 폴더가 없거나, 레일 원본 폴더 자신이거나(실제 경로로 비교), `.git` 이 없으면 멈춥니다. 하위 폴더면 레포 맨 위 폴더를 알려 줍니다.
 2. **settings.json 먼저 읽기.** 아무것도 쓰기 전에 `.claude/settings.json` 을 읽어(맨 앞 BOM 은 걷음) 합쳐 봅니다. JSON 이 아니거나 맨 바깥이 객체가 아니면 아무 파일도 쓰지 않고 멈춥니다.
 3. **진행 중 검사.** 이미 레일을 쓰는 레포(`.rail/installed.json` 또는 `.rail/state.json` 이 있음)면, 커밋 안 된 변경(새 파일 포함, `.rail/state.json`·`.rail/log.jsonl`·`.rail/test-baseline.json`·`docs/plan/` 은 뺌)이 있거나 열린 작업자가 있으면 멈춥니다. 레일의 판정 함수(`worktree.mjs:dirty`, `workers.mjs:openWorkers`)를 그대로 씁니다. `--force` 면 이 검사만 건너뜁니다.
-4. **레일 파일 쓰기.** `scripts/` 의 파일(설치 도구 빼고)을 `.rail/bin/` 으로, `hooks/*.mjs` 를 `.rail/hooks/` 로, `skills/` 를 `.claude/skills/` 로 늘 새로 씁니다. 내용이 같으면 쓰지 않습니다.
-5. **시작 틀.** `templates/` 의 파일(`.gitignore` 빼고: `.rail/config.json`, 틀 다섯 개, `docs/RAIL.md`, `CLAUDE.md`)은 대상에 없을 때만 만듭니다. 그래서 이미 `CLAUDE.md` 가 있는 레포는 처음 설치 때도 그 파일을 건드리지 않습니다.
+4. **레일 파일 쓰기.** `scripts/` 의 파일(설치 도구 빼고)을 `.rail/bin/` 으로, `hooks/*.mjs` 를 `.rail/hooks/` 로, `skills/` 를 `.claude/skills/` 로, `templates/` 의 레일 틀 다섯 개와 `docs/RAIL.md` 를 같은 자리로 늘 새로 씁니다. 내용이 같으면 쓰지 않습니다.
+5. **시작 틀.** `.rail/config.json` 과 `CLAUDE.md`(`install.mjs` 의 `SEED_ONLY`)만 대상에 없을 때 만듭니다. 프로젝트가 채우는 파일이라 그 뒤로는 건드리지 않고, 이미 `CLAUDE.md` 가 있는 레포는 처음 설치 때도 그대로 둡니다.
 6. **옛 파일 지우기.** 지난 `installed.json` 의 파일 목록에 있었는데 이번 레일에 없는 파일만 지웁니다.
 7. **.gitignore.** 틀의 줄 가운데 없는 줄만 끝에 더합니다.
 8. **settings.json 합치기.** 레일 훅(명령이나 인자에 `.rail/bin/` 또는 `.rail/hooks/` 가 든 훅, 옛 셸 문자열 꼴도 알아봄)만 빼고 다섯 개를 다시 넣습니다. 다른 훅과 설정은 그대로 둡니다. 허용 네 줄은 없는 것만 더합니다(`mergeSettings`).
@@ -437,7 +437,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,897 (입구 69, 모듈 2,828) |
 | 레일 실행 코드: 훅 | `hooks/*.mjs` 4개 | 508 |
 | 레일 실행 코드 합 | | **3,405** (승인 뒤 더한 기능 줄 안내를 더하고 `rail_gap` 읽기를 빼서 1줄 줄어듦) |
-| 설치 도구 | `scripts/install.mjs` | 147 |
+| 설치 도구 | `scripts/install.mjs` | 149 |
 | 스킬 | `skills/*/*.md` 5개 | 138 |
 | 시작 틀 | `templates/` 9개(`docs/RAIL.md` 38줄, `CLAUDE.md` 11줄 포함) | 235 |
 | 시험 | `tests/*.mjs` 24개(시험 파일 23개와 도우미) | 4,417 |
