@@ -7,16 +7,26 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const HOOK = (file, args = '') => ({ type: 'command', command: `node "\${CLAUDE_PROJECT_DIR}/.rail/${file}"${args}` })
+// exec 형식(args 가 있으면 셸을 거치지 않음): Windows 에서 훅이 Git Bash 로 돌든 PowerShell 로 돌든 경로 자리표시자가 한 인자로 그대로 간다.
+const HOOK = (file, ...args) => ({ type: 'command', command: 'node', args: [`\${CLAUDE_PROJECT_DIR}/.rail/${file}`, ...args] })
 // 레일 훅: 사건마다 [matcher, 명령, 시간 상한(초)].
 export const RAIL_HOOKS = {
-  SessionStart: [[null, HOOK('bin/rail.mjs', ' status --hook'), 10], ['compact', HOOK('bin/rail.mjs', ' status --hook --compact'), 10]],
-  PreToolUse: [['Edit|Write|MultiEdit|NotebookEdit|Bash', HOOK('hooks/guard-tests.mjs'), 30]],
+  SessionStart: [[null, HOOK('bin/rail.mjs', 'status', '--hook'), 10], ['compact', HOOK('bin/rail.mjs', 'status', '--hook', '--compact'), 10]],
+  PreToolUse: [['Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell', HOOK('hooks/guard-tests.mjs'), 30]],
   Stop: [[null, HOOK('hooks/stop-check.mjs'), 400]],
   PreCompact: [[null, HOOK('hooks/pre-compact.mjs'), 30]]
 }
-export const RAIL_ALLOW = 'Bash(node .rail/bin/rail.mjs *)'
-const isRail = (h) => /\.rail[\\/](?:bin|hooks)[\\/]/.test(h?.command ?? '')
+// 명령 허용: Bash·PowerShell 도구마다, 경로를 / 로 쓰든 \ 로 쓰든.
+export const RAIL_ALLOW = ['Bash', 'PowerShell'].flatMap((t) => [`${t}(node .rail/bin/rail.mjs *)`, `${t}(node .rail\\bin\\rail.mjs *)`])
+// 레일 훅: 지금의 exec 형식(args)도, 옛 셸 문자열(command)도 알아본다.
+const isRail = (h) => /\.rail[\\/](?:bin|hooks)[\\/]/.test([h?.command, ...(Array.isArray(h?.args) ? h.args : [])].join(' '))
+// Windows 에서 Claude Code 가 쓸 Git Bash 가 보이는가: CLAUDE_CODE_GIT_BASH_PATH, PATH 의 git.exe 옆 bin\bash.exe 나 bash.exe(System32 의 WSL 것 빼고), 흔한 설치 자리.
+export function hasGitBash(env = process.env) {
+  const dirs = (env.PATH ?? env.Path ?? '').split(';').filter((d) => d && !/system32/i.test(d))
+  const at = [env.CLAUDE_CODE_GIT_BASH_PATH, ...dirs.flatMap((d) => [path.join(d, 'bash.exe'), path.join(d, '..', 'bin', 'bash.exe')]), ...['ProgramFiles', 'ProgramW6432', 'LOCALAPPDATA'].map((k) => env[k] && path.join(env[k], k === 'LOCALAPPDATA' ? 'Programs' : '', 'Git', 'bin', 'bash.exe'))]
+  return at.some((f) => f && fs.existsSync(f))
+}
+export const GIT_BASH_WARNING = `\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n[레일 설치 경고] Git Bash 를 찾지 못했습니다. Git for Windows 를 깔기를 권합니다: 없으면 Claude Code 가 Bash 도구 대신 PowerShell 을 씁니다.\n레일은 그대로 설치했고 시험 잠금은 PowerShell 명령도 보지만, 그 판정은 Bash 쪽보다 거칩니다. 이미 깔았다면 settings.json 의 env 에 CLAUDE_CODE_GIT_BASH_PATH(bash.exe 경로)를 적으세요.\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n`
 const list = (dir, rel = '') => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? list(path.join(dir, e.name), `${rel}${e.name}/`) : [`${rel}${e.name}`])) : [])
 
 // 설치할 파일: [원본 절대 경로, 대상 상대 경로]. 레일 파일과 없을 때만 만드는 시작 틀로 나눈다.
@@ -40,7 +50,7 @@ export function mergeSettings(s) {
   for (const [event, rows] of Object.entries(RAIL_HOOKS))
     out.hooks[event] = [...(out.hooks[event] ?? []), ...rows.map(([matcher, h, timeout]) => ({ ...(matcher ? { matcher } : {}), hooks: [{ ...h, timeout }] }))]
   const allow = Array.isArray(out.permissions.allow) ? out.permissions.allow : []
-  out.permissions.allow = allow.includes(RAIL_ALLOW) ? allow : [...allow, RAIL_ALLOW]
+  out.permissions.allow = [...allow, ...RAIL_ALLOW.filter((r) => !allow.includes(r))]
   return out
 }
 
@@ -88,6 +98,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const r = install(target)
     process.stdout.write(`[레일 설치] ${r.target} — 레일 ${r.commit ?? '(커밋 모름)'}${r.dirty ? ' (커밋 안 된 변경 있음)' : ''}\n${r.changed.length ? r.changed.map((c) => `  ${c}`).join('\n') : '  바뀐 파일 없음'}\n`)
+    if (process.platform === 'win32' && !hasGitBash()) process.stdout.write(GIT_BASH_WARNING)
   } catch (e) {
     process.stderr.write(`[레일 설치 실패] ${e.message}\n`)
     process.exit(1)

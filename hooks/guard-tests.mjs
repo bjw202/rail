@@ -35,14 +35,14 @@ function lockedFile(root, cwd, filePath) {
   return tracked(root, rel, true).length > 0 ? rel : null
 }
 
-// ---- Bash 명령 훑기(최선의 노력) ----
+// ---- Bash·PowerShell 명령 훑기(최선의 노력) ----
 
 function stripHeredocs(cmd) {
   return cmd.replace(/<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n[ \t]*\2(?=\n|$)/g, '\n')
 }
 
-// 따옴표와 역슬래시를 읽는 단순한 셸 낱말 쪼개기. 연산자(; & | < > 줄바꿈)는 따로 뗀다.
-function tokenize(cmd) {
+// 따옴표와 이스케이프 글자(Bash 는 \, PowerShell 은 `)를 읽는 단순한 셸 낱말 쪼개기. 연산자(; & | < > 줄바꿈)는 따로 뗀다.
+function tokenize(cmd, esc = '\\') {
   const tokens = []
   let cur = ''
   let has = false
@@ -62,11 +62,11 @@ function tokenize(cmd) {
     } else if (c === '"') {
       i++
       while (i < cmd.length && cmd[i] !== '"') {
-        if (cmd[i] === '\\' && i + 1 < cmd.length) i++
+        if (cmd[i] === esc && i + 1 < cmd.length) i++
         cur += cmd[i++]
       }
       has = true
-    } else if (c === '\\' && i + 1 < cmd.length) {
+    } else if (c === esc && i + 1 < cmd.length) {
       cur += cmd[++i]
       has = true
     } else if (/\s/.test(c) && c !== '\n') {
@@ -116,17 +116,22 @@ function splitCommands(tokens) {
 
 const WRAPPERS = new Set(['sudo', 'env', 'command', 'time', 'nice', 'nohup', 'exec'])
 
+// PowerShell 의 쓰기·지우기·옮기기 cmdlet 과 그 별칭(대소문자 무시). Copy-Item 은 대상(-Destination 또는 마지막 낱말)만 본다.
+const PS_WRITE = ['remove-item', 'ri', 'del', 'erase', 'rd', 'move-item', 'mi', 'move', 'rename-item', 'ren', 'rni', 'set-content', 'sc', 'add-content', 'ac', 'clear-content', 'clc', 'out-file', 'new-item', 'ni', 'tee-object']
+const PS_COPY = ['copy-item', 'cpi', 'copy']
+
 // 한 명령이 쓰거나 지우는 대상 후보(낱말)를 모은다.
 function targetsOf(words) {
   let w = [...words]
   while (w.length && (/^\w+=/.test(w[0]) || WRAPPERS.has(path.basename(w[0])))) w.shift()
   if (!w.length) return { targets: [], nested: [] }
-  const name = path.basename(w[0])
+  const name = path.basename(w[0]).toLowerCase().replace(/\.exe$/, '')
   const args = w.slice(1)
   const plain = args.filter((a) => !a.startsWith('-'))
   const hasI = args.some((a) => /^-[a-zA-Z]*i/.test(a) || a === '--in-place' || a.startsWith('--in-place='))
-  if (['rm', 'unlink', 'rmdir', 'truncate', 'shred', 'mv', 'tee'].includes(name)) return { targets: plain, nested: [] }
-  if (['cp', 'install'].includes(name)) return { targets: plain.slice(-1), nested: [] }
+  if (['rm', 'unlink', 'rmdir', 'truncate', 'shred', 'mv', 'tee', ...PS_WRITE].includes(name)) return { targets: plain, nested: [] }
+  const dest = args.findIndex((a) => /^-dest/i.test(a))
+  if (['cp', 'install', ...PS_COPY].includes(name)) return { targets: dest >= 0 ? args.slice(dest + 1, dest + 2) : plain.slice(-1), nested: [] }
   if ((name === 'sed' || name === 'perl') && hasI) return { targets: plain, nested: [] }
   if (name === 'dd') return { targets: args.filter((a) => a.startsWith('of=')).map((a) => a.slice(3)), nested: [] }
   if (name === 'git') {
@@ -137,33 +142,35 @@ function targetsOf(words) {
       return { targets: list, nested: [] }
     }
   }
-  if (['sh', 'bash', 'zsh'].includes(name)) {
-    const ci = args.findIndex((a) => /^-[a-zA-Z]*c/.test(a))
-    if (ci >= 0 && args[ci + 1]) return { targets: [], nested: [args[ci + 1]] }
+  const ps = ['pwsh', 'powershell'].includes(name)
+  if (ps || ['sh', 'bash', 'zsh'].includes(name)) {
+    const ci = args.findIndex((a) => (ps ? /^-c(ommand)?$/i : /^-[a-zA-Z]*c/).test(a))
+    if (ci >= 0 && args[ci + 1]) return { targets: [], nested: [{ cmd: args[ci + 1], ps }] }
   }
   return { targets: [], nested: [] }
 }
 
 // 낱말이 가리키는 추적 중인 시험 파일 하나를 돌려준다. 없으면 null.
-function lockedWord(root, cwd, word) {
+function lockedWord(root, cwd, word, ps) {
   if (!word || word.includes('$') || word.includes('`') || word === '/dev/null') return null
-  const rel = toRepoRel(root, path.resolve(cwd, word))
+  const rel = toRepoRel(root, path.resolve(cwd, ps ? word.replace(/\\/g, '/') : word))
   if (rel.startsWith('..') || path.isAbsolute(rel)) return null
   const spec = rel === '' ? '.' : rel
   return tracked(root, spec, false).find(isTestPath) ?? inBaseline(root, spec)
 }
 
-function lockedByBash(root, cwd, command, depth = 0) {
+// ps: PowerShell 도구의 명령(이스케이프는 `, 경로의 \ 는 구분자). heredoc 은 Bash 에만 있다.
+function lockedByShell(root, cwd, command, ps, depth = 0) {
   if (depth > 3) return null
-  const cmds = splitCommands(tokenize(stripHeredocs(command)))
+  const cmds = splitCommands(ps ? tokenize(command, '`') : tokenize(stripHeredocs(command)))
   for (const { words, redirects } of cmds) {
     const { targets, nested } = targetsOf(words)
     for (const word of [...redirects, ...targets]) {
-      const hit = lockedWord(root, cwd, word)
+      const hit = lockedWord(root, cwd, word, ps)
       if (hit) return hit
     }
     for (const inner of nested) {
-      const hit = lockedByBash(root, cwd, inner, depth + 1)
+      const hit = lockedByShell(root, cwd, inner.cmd, inner.ps, depth + 1)
       if (hit) return hit
     }
   }
@@ -190,7 +197,7 @@ async function main() {
   let hit = null
   if (tool === 'Edit' || tool === 'Write' || tool === 'MultiEdit') hit = lockedFile(root, cwd, ti.file_path)
   else if (tool === 'NotebookEdit') hit = lockedFile(root, cwd, ti.notebook_path ?? ti.file_path)
-  else if (tool === 'Bash' && typeof ti.command === 'string') hit = lockedByBash(root, cwd, ti.command)
+  else if ((tool === 'Bash' || tool === 'PowerShell') && typeof ti.command === 'string') hit = lockedByShell(root, cwd, ti.command, tool === 'PowerShell')
   if (!hit) return
   deny(hit)
   railLog(root, 'hook_blocked', { hook: 'guard-tests', file: hit, tool: tool ?? null })

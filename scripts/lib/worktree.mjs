@@ -12,7 +12,9 @@ import { appendLog, loadState, readEvents, withLock } from './state.mjs'
 
 export const MAKER_ROLES = ['feature', 'impl', 'test', 'fix']
 export const isolated = (role) => isolation() === 'worktree' && MAKER_ROLES.includes(role)
-export const wtDir = (step) => path.resolve(ROOT, loadConfig().worktreeDir || path.join(os.homedir(), 'orca/workspaces', path.basename(ROOT)), `rail-${step}`)
+// 경로 설정의 ~/ 와 ~\ 는 홈 폴더로 푼다(설정 파일은 셸을 거치지 않아 아무도 풀어 주지 않는다).
+const homePath = (p) => (typeof p === 'string' && /^~(?=[\\/]|$)/.test(p) ? path.join(os.homedir(), p.slice(1)) : p)
+export const wtDir = (step) => path.resolve(ROOT, homePath(loadConfig().worktreeDir) || path.join(os.homedir(), 'orca/workspaces', path.basename(ROOT)), `rail-${step}`)
 // 레일 기록 파일: 작업자 세션의 훅도 쓰므로 worktree 에서는 git 이 보지 않게 한다(작업자 커밋·합치기에 섞이지 않게).
 const RECORDS = ['.rail/state.json', '.rail/log.jsonl', BASELINE]
 function g(cwd, ...args) {

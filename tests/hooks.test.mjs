@@ -54,6 +54,35 @@ describe('시험 파일 잠금: Bash', () => {
   test('우회 변수가 있으면 Bash 도 통과한다', () => assert.equal(denied(bash('rm tests/x.test.mjs', { RAIL_ALLOW_TEST_EDIT: '1' })), false))
 })
 
+// Windows 의 Claude Code 는 PowerShell 도구를 기본으로 켤 수 있다. 같은 잠금을 PowerShell 명령에도 건다(최선의 노력, 대소문자·별칭·\ 경로).
+describe('시험 파일 잠금: PowerShell', () => {
+  const ps = (command) => call('PowerShell', { command })
+  for (const [name, cmd] of [
+    ['Set-Content', "Set-Content -Path tests\\x.test.mjs -Value 'z'"],
+    ['Add-Content', 'Add-Content tests/x.test.mjs "z"'],
+    ['파이프 Out-File', "'z' | Out-File -FilePath tests\\x.test.mjs"],
+    ['리다이렉트 >>', "echo 'z' >> tests\\x.test.mjs"],
+    ['Remove-Item 대소문자', 'remove-item -Force fixtures\\doc.txt'],
+    ['del 별칭', 'del tests\\x.test.mjs'],
+    ['Move-Item', 'Move-Item tests\\x.test.mjs tests\\z.mjs'],
+    ['Rename-Item', 'Rename-Item tests\\x.test.mjs z.test.mjs'],
+    ['Copy-Item 대상', 'Copy-Item src\\a.mjs -Destination tests\\x.test.mjs'],
+    ['New-Item -Force', 'New-Item -Force -ItemType File tests\\x.test.mjs'],
+    ['폴더 통째로', 'Remove-Item -Recurse tests'],
+    ['git checkout', 'git checkout -- tests\\x.test.mjs'],
+    ['pwsh -Command 안', 'pwsh -NoProfile -Command "Remove-Item tests\\x.test.mjs"']
+  ])
+    test(`${name} → 거절`, () => assert.ok(denied(ps(cmd))))
+  for (const [name, cmd] of [
+    ['Get-Content', 'Get-Content tests\\x.test.mjs'],
+    ['Copy-Item 원본', 'Copy-Item tests\\x.test.mjs src\\copy.mjs'],
+    ['새 시험 파일', "Set-Content tests\\brand-new.test.mjs 'z'"],
+    ['변수 경로', 'Remove-Item $env:TEMP\\x'],
+    ['따옴표 안 글', 'git commit -m "Remove-Item tests/x.test.mjs"']
+  ])
+    test(`${name} → 허용`, () => assert.equal(denied(ps(cmd)), false))
+})
+
 describe('마무리 검사', () => {
   const stop = (r, env = {}, extra = {}) => runHook('stop-check.mjs', { hook_event_name: 'Stop', cwd: r, stop_hook_active: false, ...extra }, env)
   const FAIL = { RAIL_STOP_CHECK_CMD: "node -e \"console.log('boom: 시험 실패'); process.exit(1)\"" }

@@ -1,10 +1,11 @@
 // 레포마다 설치: node scripts/install.mjs <대상>. 다시 돌리면 업데이트이고, 레일 훅은 한 번만 들어가며, 상태·기획서와 다른 설정은 그대로다.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
+import { GIT_BASH_WARNING, hasGitBash } from '../scripts/install.mjs'
 import { denied, git, put, tmp } from './helpers.mjs'
 
 const INSTALL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts/install.mjs')
@@ -14,7 +15,8 @@ const install = (target) => {
 }
 const read = (root, rel) => readFileSync(path.join(root, rel), 'utf8')
 const settings = (root) => JSON.parse(read(root, '.claude/settings.json'))
-const railCommands = (s) => Object.values(s.hooks).flat().flatMap((e) => e.hooks.map((h) => h.command)).filter((c) => c.includes('.rail/'))
+const railCommands = (s) => Object.values(s.hooks).flat().flatMap((e) => e.hooks.map((h) => [h.command, ...(h.args ?? [])].join(' '))).filter((c) => c.includes('.rail/'))
+const ALLOW = ['Bash(node .rail/bin/rail.mjs *)', 'Bash(node .rail\\bin\\rail.mjs *)', 'PowerShell(node .rail/bin/rail.mjs *)', 'PowerShell(node .rail\\bin\\rail.mjs *)']
 
 function repo() {
   const root = tmp('rail-inst-')
@@ -36,16 +38,17 @@ describe('설치', () => {
       assert.ok(existsSync(path.join(root, f)), f)
     assert.ok(!existsSync(path.join(root, '.rail/bin/install.mjs')), '설치 도구는 깔지 않는다')
     const s = settings(root)
-    assert.deepEqual([s.env, s.permissions.allow], [{ A: '1' }, ['Bash(npm test)', 'Bash(node .rail/bin/rail.mjs *)']])
+    assert.deepEqual([s.env, s.permissions.allow], [{ A: '1' }, ['Bash(npm test)', ...ALLOW]])
     assert.equal(s.hooks.Stop[0].hooks[0].command, 'echo 내 훅', '다른 훅은 그대로')
     assert.deepEqual(railCommands(s).sort(), [
-      'node "${CLAUDE_PROJECT_DIR}/.rail/bin/rail.mjs" status --hook',
-      'node "${CLAUDE_PROJECT_DIR}/.rail/bin/rail.mjs" status --hook --compact',
-      'node "${CLAUDE_PROJECT_DIR}/.rail/hooks/guard-tests.mjs"',
-      'node "${CLAUDE_PROJECT_DIR}/.rail/hooks/pre-compact.mjs"',
-      'node "${CLAUDE_PROJECT_DIR}/.rail/hooks/stop-check.mjs"'
+      'node ${CLAUDE_PROJECT_DIR}/.rail/bin/rail.mjs status --hook',
+      'node ${CLAUDE_PROJECT_DIR}/.rail/bin/rail.mjs status --hook --compact',
+      'node ${CLAUDE_PROJECT_DIR}/.rail/hooks/guard-tests.mjs',
+      'node ${CLAUDE_PROJECT_DIR}/.rail/hooks/pre-compact.mjs',
+      'node ${CLAUDE_PROJECT_DIR}/.rail/hooks/stop-check.mjs'
     ])
     assert.equal(s.hooks.SessionStart[1].matcher, 'compact')
+    assert.equal(s.hooks.PreToolUse[0].matcher, 'Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell', '시험 잠금은 PowerShell 도구도 본다')
     const gi = read(root, '.gitignore').split('\n')
     assert.deepEqual(gi.slice(0, 3), ['node_modules/', '.orchestration/', '.rail/.lock'], '있는 줄은 그대로, 없는 줄만 더한다')
     assert.equal(gi.filter((l) => l === '.orchestration/').length, 1)
@@ -62,6 +65,43 @@ describe('설치', () => {
     assert.equal(read(root, '.claude/settings.json'), first)
     assert.equal(railCommands(settings(root)).length, 5)
     assert.equal(read(root, '.gitignore').split('\n').filter((l) => l === '.rail/.lock').length, 1)
+  })
+
+  test('옛 셸 문자열 레일 훅은 exec 형식(command: node, args)으로 바뀌고 두 번 들어가지 않으며, 옛 허용 줄도 한 번만 남는다', () => {
+    const root = repo()
+    const old = (f, a = '') => ({ type: 'command', command: `node "\${CLAUDE_PROJECT_DIR}/.rail/${f}"${a}`, timeout: 30 })
+    put(root, '.claude/settings.json', JSON.stringify({
+      permissions: { allow: ['Bash(node .rail/bin/rail.mjs *)'] },
+      hooks: { SessionStart: [{ hooks: [old('bin/rail.mjs', ' status --hook')] }], PreToolUse: [{ matcher: 'Edit|Write|MultiEdit|NotebookEdit|Bash', hooks: [old('hooks/guard-tests.mjs')] }], Stop: [{ hooks: [{ type: 'command', command: 'echo 내 훅' }, old('hooks/stop-check.mjs')] }] }
+    }))
+    assert.equal(install(root).code, 0)
+    const s = settings(root)
+    assert.equal(railCommands(s).length, 5)
+    const rail = Object.values(s.hooks).flat().flatMap((e) => e.hooks).filter((h) => h.command !== 'echo 내 훅')
+    assert.ok(rail.every((h) => h.command === 'node' && h.args[0].startsWith('${CLAUDE_PROJECT_DIR}/.rail/')), JSON.stringify(rail))
+    assert.deepEqual(s.hooks.Stop.map((e) => e.hooks.map((h) => h.command)), [['echo 내 훅'], ['node']])
+    assert.deepEqual(s.permissions.allow, ALLOW)
+    // Claude Code 처럼 args 의 자리표시자만 바꿔 셸 없이 부르면 시험 잠금이 돈다.
+    git(root, 'add', '-A')
+    git(root, 'commit', '-q', '-m', 'rail')
+    const guard = s.hooks.PreToolUse[0].hooks[0]
+    const env = { ...process.env }
+    delete env.RAIL_ALLOW_TEST_EDIT
+    const r = spawnSync(guard.command, guard.args.map((a) => a.replace('${CLAUDE_PROJECT_DIR}', root)), { input: JSON.stringify({ cwd: root, tool_name: 'PowerShell', tool_input: { command: 'Remove-Item tests\\old.test.mjs' } }), encoding: 'utf8', env })
+    assert.ok(denied({ stdout: r.stdout }), r.stdout + r.stderr)
+  })
+
+  test('Windows 에서 Git Bash 를 찾는다: CLAUDE_CODE_GIT_BASH_PATH, PATH 의 git 옆 bash, 흔한 설치 자리. 없으면 경고 글을 낸다', () => {
+    const base = tmp('rail-gb-')
+    put(base, 'Git/bin/bash.exe', '')
+    mkdirSync(path.join(base, 'Git/cmd'))
+    assert.equal(hasGitBash({ PATH: path.join(base, 'nothing') }), false)
+    assert.equal(hasGitBash({ CLAUDE_CODE_GIT_BASH_PATH: path.join(base, 'Git/bin/bash.exe') }), true)
+    assert.equal(hasGitBash({ PATH: `${path.join(base, 'x')};${path.join(base, 'Git/cmd')}` }), true, 'git.exe 가 있는 cmd 폴더 옆 bin')
+    assert.equal(hasGitBash({ ProgramFiles: base }), true)
+    put(base, 'System32/bash.exe', '')
+    assert.equal(hasGitBash({ PATH: path.join(base, 'System32'), CLAUDE_CODE_GIT_BASH_PATH: path.join(base, 'none.exe') }), false, 'System32 의 bash.exe 는 WSL 것')
+    assert.match(GIT_BASH_WARNING, /Git for Windows 를 깔기를 권합니다: 없으면 Claude Code 가 Bash 도구 대신 PowerShell 을 씁니다/)
   })
 
   test('업데이트는 레일 파일만 새로 쓰고, 상태·기록·기획서·설정과 고친 시작 틀은 덮지 않으며, 레일에서 빠진 파일은 지운다', () => {

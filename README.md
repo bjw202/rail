@@ -69,7 +69,7 @@ AI 코딩 작업을 **기획 → 마일스톤 → 확인**의 순서로 끌고 �
 | 것 | 왜 필요한가 | 꼭 있어야 하나 |
 |---|---|---|
 | Node.js 22 이상 | 레일 스크립트와 설치 명령이 Node 로 돕니다(의존성 없음, 내장 모듈만 씀) | 예 |
-| Git | 상태 비교, 시험 잠금, worktree, 커밋 | 예 |
+| Git | 상태 비교, 시험 잠금, worktree, 커밋 | 예. Windows 는 Git for Windows 를 권합니다(Git Bash 가 따라옵니다. 없으면 Claude Code 가 Bash 도구 대신 PowerShell 을 쓰고, 설치 명령이 경고를 냅니다) |
 | Claude Code | 리더와 작업자 세션 | 예 |
 | Orca | 작업자를 창에 띄우고 닫기, 끝난 작업자의 알림으로 리더 깨우기, 밤샘 자동화 | 작업자를 쓰려면 예 |
 | Codex CLI | 마지막 리뷰를 다른 회사 모델로 받기 | 아니요. 없으면 Claude 작업자로 대신 띄우고 경고합니다 |
@@ -116,7 +116,7 @@ node C:\tools\rail\scripts\install.mjs C:\projects\my-app
 | `.rail/bin/rail.mjs`, `.rail/bin/lib/*.mjs` | 레일 본체. 상태 판정과 "다음 할 일" 문구가 모두 여기 있습니다 | 새 판으로 바뀜 |
 | `.rail/hooks/*.mjs` | 훅(Claude Code 가 정해진 순간에 저절로 부르는 작은 스크립트) | 새 판으로 바뀜 |
 | `.claude/skills/rail/`, `rail-plan/`, `rail-milestone/`, `rail-check/` | `/rail` 스킬과 단계별 판단 지침 | 새 판으로 바뀜 |
-| `.claude/settings.json` | 레일 훅 다섯 개와 명령 허용 한 줄(`Bash(node .rail/bin/rail.mjs *)`) | 레일 훅만 바꿈. 다른 설정과 다른 훅은 그대로 |
+| `.claude/settings.json` | 레일 훅 다섯 개(셸을 거치지 않는 `"command": "node", "args": [...]` 꼴)와 명령 허용 네 줄(`Bash(node .rail/bin/rail.mjs *)`, 같은 것의 `PowerShell(…)` 판, 그리고 둘 다 `.rail\bin\rail.mjs` 로 쓴 판) | 레일 훅만 바꿈. 다른 설정과 다른 훅은 그대로 |
 | `.rail/config.json` | 프로젝트마다 다른 값(아래 8절) | 있으면 건드리지 않음 |
 | `.rail/plan/template.md` | 기획서 틀 | 있으면 건드리지 않음 |
 | `.rail/trial/template.md` | 가정 시험 지시서 틀 | 있으면 건드리지 않음 |
@@ -222,6 +222,8 @@ node C:\tools\rail\scripts\install.mjs C:\projects\my-app
 | `autonomy.budget.milestone` | 지난 마일스톤 비용 중간값의 몇 배 `{ "on", "times" }` | `{ on: true, times: 3 }` |
 | `autonomy.budget.daily` | 하루 상한 `{ "on", "usd" }` | `{ on: false }` |
 
+`checkCommand`, `verify` 의 `command`, `autonomy.budget.costCommand` 는 셸에서 돕니다. 맥·리눅스는 `sh`, **Windows 는 cmd.exe** 입니다. cmd.exe 는 작은따옴표를 따옴표로 읽지 않으므로, 두 OS 에서 같이 쓰려면 따옴표는 큰따옴표로 쓰세요(JSON 안에서는 `\"`). 예: `"checkCommand": "node --test \"tests/*.test.mjs\""`. `worktreeDir` 는 `~/` 나 `~\` 로 시작하면 홈 폴더로 풉니다.
+
 ## 9. 자율 모드 (밤새 돌리기)
 
 자율 모드는 사람이 자리를 비운 동안 리더가 멈추지 않고 다음 일을 이어 가게 합니다.
@@ -245,10 +247,21 @@ node C:\tools\rail\scripts\install.mjs C:\projects\my-app
 
 **Orca 자동화로 리더 깨우기 (예시).** 30분마다 `next --precheck` 를 돌려 할 일이 있을 때만 리더에게 "/rail 로 이어서 진행"을 보내게 합니다. 아래는 모양을 보이는 예시이고, 정확한 옵션은 `orca automations create --help` 로 확인하세요.
 
+맥(터미널):
+
 ```sh
 orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" \
   --workspace "path:$HOME/projects/my-app" --provider claude --reuse-session \
   --precheck "node .rail/bin/rail.mjs next --precheck" \
+  --prompt "/rail 로 이어서 진행"
+```
+
+Windows(PowerShell, 줄 끝 백틱이 줄 이음입니다):
+
+```powershell
+orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
+  --workspace "path:$env:USERPROFILE\projects\my-app" --provider claude --reuse-session `
+  --precheck "node .rail/bin/rail.mjs next --precheck" `
   --prompt "/rail 로 이어서 진행"
 ```
 
@@ -262,7 +275,7 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" \
 |---|---|---|
 | 세션 시작 (`status --hook`) | Claude Code 세션을 열 때 | 위치 세 줄을 보여 주고 "레일로 진행합니다"를 알립니다 |
 | 압축 직후 (`status --hook --compact`) | 대화가 압축된 뒤 | 위치와 다시 읽을 파일을 알려 이어받게 합니다 |
-| 시험 잠금 (`.rail/hooks/guard-tests.mjs`) | 파일을 고치거나 셸 명령을 쓰기 직전 | 이미 있는 시험 파일(git 이 추적하는 `tests/`·`test/`·`fixtures/`·`*.test.*`·`*.spec.*`, 시험 step 이 끝날 때 찍은 기준선에 든 파일)을 고치거나 지우지 못하게 합니다. 새 시험 파일은 만들 수 있습니다. 우회는 `RAIL_ALLOW_TEST_EDIT=1` 을 붙여 띄운 세션만 됩니다 |
+| 시험 잠금 (`.rail/hooks/guard-tests.mjs`) | 파일을 고치거나 셸 명령(Bash 도구, Windows 의 PowerShell 도구)을 쓰기 직전 | 이미 있는 시험 파일(git 이 추적하는 `tests/`·`test/`·`fixtures/`·`*.test.*`·`*.spec.*`, 시험 step 이 끝날 때 찍은 기준선에 든 파일)을 고치거나 지우지 못하게 합니다. 새 시험 파일은 만들 수 있습니다. 우회는 `RAIL_ALLOW_TEST_EDIT=1` 을 붙여 띄운 세션만 됩니다 |
 | 마무리 검사 (`.rail/hooks/stop-check.mjs`) | 세션이 멈추려 할 때 | 제품 파일이 바뀌었으면 `checkCommand` 를 돌리고, 실패하면 멈추지 못하게 붙잡아 고치게 합니다. 같은 실패는 두 번까지만 붙잡고, 사람 답을 기다리는 동안은 붙잡지 않습니다 |
 | 압축 직전 (`.rail/hooks/pre-compact.mjs`) | 대화를 압축하기 직전 | 위치·열린 작업자·열린 질문을 요약에 글자 그대로 남기라고 지시합니다 |
 

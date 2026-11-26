@@ -47,10 +47,10 @@ else say({ ok: true, result: {} })
   const calls = () => (existsSync(path.join(base, 'calls.jsonl')) ? readFileSync(path.join(base, 'calls.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : [])
   return { root, base, wt: (step) => path.join(base, 'wts', `rail-${step}`), fake, calls }
 }
-function run(r, args) {
+function run(r, args, extra = {}) {
   const env = { ...process.env }
   for (const k of ['CLAUDE_CODE_SESSION_ID', 'ORCA_AGENT_SESSION_ID', 'ORCA_TERMINAL_HANDLE', 'NODE_TEST_CONTEXT', 'RAIL_NO_TOUCH']) delete env[k]
-  const p = spawnSync(process.execPath, [RAIL, ...args], { encoding: 'utf8', env: { ...env, ORCA_CLI_COMMAND: r.fake, RAIL_ROOT: r.root } })
+  const p = spawnSync(process.execPath, [RAIL, ...args], { encoding: 'utf8', env: { ...env, ORCA_CLI_COMMAND: r.fake, RAIL_ROOT: r.root, ...extra } })
   return { code: p.status, out: p.stdout, err: p.stderr }
 }
 const ok = (x) => assert.equal(x.code, 0, x.err + x.out)
@@ -84,6 +84,19 @@ describe('worktree 방식: 만들기 → 작업자 커밋 → 합치기 → 지�
     // 레일 기록 파일은 worktree 에서 git 이 보지 않는다(S = skip-worktree).
     assert.match(git(dir, 'ls-files', '-v', '.rail/state.json', '.rail/log.jsonl'), /^S \.rail\/log\.jsonl\nS \.rail\/state\.json/)
     assert.match(run(r, ['status']).out, /남은 worktree 1개: rail-M0-1\(작업 중\)/)
+  })
+
+  test('worktreeDir 가 ~/ 나 ~\\ 로 시작하면 홈 폴더 아래로 푼다', () => {
+    for (const dirSetting of ['~/wts', '~\\wts']) {
+      if (dirSetting.includes('\\') && !WIN) continue // 맥·리눅스에서 \ 는 경로 구분자가 아니다
+      const r = repo()
+      const cfg = JSON.parse(readFileSync(path.join(r.root, '.rail/config.json'), 'utf8'))
+      put(r.root, '.rail/config.json', JSON.stringify({ ...cfg, worktreeDir: dirSetting }))
+      git(r.root, 'commit', '-qam', 'cfg')
+      ok(run(r, ['worker', 'start', 'M0-1', '--agent', 'claude', '--role', 'feature'], { HOME: r.base, USERPROFILE: r.base }))
+      assert.ok(existsSync(r.wt('M0-1')), dirSetting)
+      assert.equal(events(r.root).find((e) => e.event === 'worker_start').worktree, r.wt('M0-1'))
+    }
   })
 
   test('worker done 이 작업자 브랜치를 앞으로 감기로 합치고, 곧바로 worktree 와 브랜치를 지우며, 작업자 세션의 사건을 main 기록으로 옮긴다', () => {

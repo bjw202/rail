@@ -32,3 +32,6 @@
 
 ## 훅
 세션을 열 때 위치 세 줄 보여 주기, 이미 있는 시험 파일과 `fixtures/` 고치기 막기(우회는 `RAIL_ALLOW_TEST_EDIT=1` 을 붙여 Claude 를 띄우기), 멈추기 전 마무리 검사(`checkCommand` 가 비면 건너뜀), 압축 직전 요약 지시와 압축 직후 이어받기 안내.
+
+## 검사 명령 쓰기
+`checkCommand`, `verify` 의 `command`, `autonomy.budget.costCommand` 는 셸에서 돕니다. Windows 에서는 cmd.exe 라 작은따옴표가 따옴표로 먹지 않으니, 따옴표는 큰따옴표로 쓰세요(JSON 안에서는 `\"`).
