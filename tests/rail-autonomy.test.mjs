@@ -196,6 +196,17 @@ describe('next 의 멈춤 까닭과 --precheck', () => {
     }
   })
 
+  test('비용 명령이 비었으면 예산 규칙을 쓰지 않고 멈추지 않는다. status 는 경고 한 줄을 낸다', () => {
+    const root = milestoneRoot(budgetConfig(''))
+    const res = next(root)
+    assert.equal(res.stop, null)
+    assert.match(res.budget.note, /비용 명령\(autonomy\.budget\.costCommand\)이 비어 예산 규칙을 쓰지 않습니다/)
+    assert.equal(precheck(root).code, 0)
+    assert.match(run(root, ['next']).out, /^할 일: .*\n  비용 명령/)
+    assert.match(run(root, ['status']).out, /\n\[경고\] 비용 명령\(autonomy\.budget\.costCommand\)이 비어/)
+    assert.doesNotMatch(run(milestoneRoot(budgetConfig(fakeCost(tmp(), 0, 1))), ['status']).out, /\[경고\] 비용 명령/)
+  })
+
   test('same_failure: 마무리 검사의 같은 실패 지문이 maxSameFailure 번 이어지면 멈춘다 (종료 코드 13)', () => {
     const make = (count) => {
       const root = milestoneRoot(budgetConfig(fakeCost(tmp(), 0, 0)))
@@ -317,6 +328,8 @@ function workerRoot(fake = {}) {
   for (const s of ['M0-1', 'M0-2a', 'M0-2b', 'M0-3']) put(root, `.orchestration/${s}-spec.md`, `# ${s} 짧은 일\n\n할 일\n`)
   return { root, orca: fakeOrca(root, fake) }
 }
+// PATH 에 codex 하나만 있는 폴더(진짜 codex 가 없는 컴퓨터에서도 같게).
+const fakeCodex = (root) => (put(root, 'bin-codex/codex', ''), put(root, 'bin-codex/codex.cmd', ''), path.join(root, 'bin-codex'))
 const sub = (calls, a, b) => calls.filter((c) => c[0] === a && c[1] === b)
 const opt = (c, k) => c[c.indexOf(k) + 1]
 
@@ -359,9 +372,23 @@ describe('worker start / done', () => {
   test('Codex 는 업데이트 안내를 끄는 인자를 붙인다', () => {
     const { root, orca } = workerRoot()
     ok(run(root, ['step-start', 'M0-1'], orca.env))
-    const r = run(root, ['worker', 'start', 'M0-1', '--agent', 'codex', '--role', 'test'], orca.env)
+    const r = run(root, ['worker', 'start', 'M0-1', '--agent', 'codex', '--role', 'test'], { ...orca.env, PATH: fakeCodex(root) })
     ok(r)
     assert.equal(opt(sub(orca.calls(), 'terminal', 'split')[0], '--command'), 'codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false')
+  })
+
+  test('codex 가 PATH 에 없으면 Claude 작업자로 대신 띄우고 경고와 codex_missing 을 남긴다', () => {
+    const { root, orca } = workerRoot()
+    const bin = path.join(root, 'bin-no-codex')
+    mkdirSync(bin)
+    ok(run(root, ['step-start', 'M0-1'], orca.env))
+    const r = run(root, ['worker', 'start', 'M0-1', '--agent', 'codex', '--role', 'test'], { ...orca.env, PATH: bin })
+    ok(r)
+    assert.match(r.out, /\[경고\] codex 명령이 PATH 에 없어 M0-1 를 Claude 작업자로 띄웁니다 \(다른 회사 모델 시각 없음\)/)
+    assert.match(opt(sub(orca.calls(), 'terminal', 'split')[0], '--command'), /^claude --model opus /)
+    const e = events(root)
+    assert.deepEqual(e.find((x) => x.event === 'codex_missing').steps, ['M0-1'])
+    assert.equal(e.find((x) => x.event === 'worker_start').agent, 'claude')
   })
 
   test('step-start 전이거나 명세가 없거나 이미 작업자가 있으면 창을 띄우지 않고 거절한다', () => {

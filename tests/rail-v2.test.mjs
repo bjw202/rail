@@ -1,10 +1,10 @@
-// 레일 2.0판: 바깥 정답 검증기(verify) 관문, 장면 리허설 관문, 닫힘 알림, Codex 역할 경고.
+// 바깥 정답 검증기(verify) 관문, 장면 리허설 관문, 닫힘 알림.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { GOOD_PLAN, RAIL, events, put, state, tmp } from './helpers.mjs'
+import { GOOD_PLAN, RAIL, events, markRehearsed, put, state, tmp } from './helpers.mjs'
 
 const NODE = JSON.stringify(process.execPath)
 const exitWith = (code) => `${NODE} -e "process.exit(${code})"`
@@ -58,6 +58,7 @@ describe('verify 관문', () => {
     assert.equal(typeof run.results[0].ms, 'number')
     assert.deepEqual(run.results[0].tail, ['끝줄'])
     assert.equal(rail(root, 'advance', 'check').code, 0)
+    markRehearsed(root)
     assert.equal(rail(root, 'scene', 'M0', '--result', 'pass', '--note', '봤다').code, 0)
   })
 
@@ -94,7 +95,7 @@ describe('verify 관문', () => {
 
 describe('장면 리허설 관문', () => {
   test('2.0판은 리허설 기록 없이 장면 확인을 거절하고, 기록하면 실패 항목을 먼저 알린다', () => {
-    const root = ready({ railVersion: '2.0' })
+    const root = ready()
     assert.equal(rail(root, 'advance', 'check').code, 0)
     const blocked = rail(root, 'scene', 'M0', '--result', 'pass', '--note', '봤다')
     assert.equal(blocked.code, 1)
@@ -116,27 +117,19 @@ describe('장면 리허설 관문', () => {
     assert.ok(names(root).includes('rehearsal_recorded'))
   })
 
-  test('1.x판(railVersion 없음)은 예전처럼 리허설 없이 장면을 기록한다', () => {
-    const root = ready({})
-    rail(root, 'advance', 'check')
-    assert.equal(rail(root, 'scene', 'M0', '--result', 'pass', '--note', '봤다').code, 0)
-  })
-
-  test('check 단계 중간에 2.0판으로 바뀌면 verify 와 리허설을 그 자리에서 요구하고, 닫힌 마일스톤은 다시 보지 않는다', () => {
+  test('check 단계 중간에 검증기가 생기면 그 자리에서 요구하고, 닫힌 마일스톤은 다시 보지 않는다', () => {
     const root = tmp()
-    config(root, { railVersion: '1.2' })
+    config(root, {})
     put(root, 'docs/PLAN.md', GOOD_PLAN)
     put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 파일 | 완료 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | a | b | c | ✅ 끝(2026-11-20) 됨 |\n')
     put(root, 'docs/plan/M1.md', '| step | 맡는 쪽 | 할 일 | 파일 | 완료 | 상태 |\n|---|---|---|---|---|---|\n| M1-1 | 구현 | a | b | c | |\n')
-    // M0 은 1.2판으로 리허설 없이 닫혔다.
+    // M0 은 리허설 기록 없이 닫혔다.
     put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M1', step: null, gates: { scene_checked: { M0: { result: 'pass', note: '확인', at: '2026-11-20T00:00:00Z' } } }, closed: ['M0'] }))
     rail(root, 'step-start', 'M1-1')
     rail(root, 'step-done', 'M1-1', '--note', '됨')
     assert.equal(rail(root, 'advance', 'check').code, 0)
     assert.equal(state(root).stage, 'check')
-    // 여기서 2.0판으로 합쳐졌다.
-    put(root, 'docs/RAIL.md', '# 레일\n레일 2.0판\n')
-    config(root, { railVersion: '2.0', verify: [{ name: 'ok', command: exitWith(0) }] })
+    config(root, { verify: [{ name: 'ok', command: exitWith(0) }] })
     const blocked = rail(root, 'scene', 'M1', '--result', 'pass', '--note', '봤다')
     assert.equal(blocked.code, 1)
     assert.match(blocked.err, /verify 기록이 없습니다/)
@@ -150,7 +143,7 @@ describe('장면 리허설 관문', () => {
   })
 
   test('reopen 하면 리허설 기록도 지운다(고친 뒤 다시 해 봐야 한다)', () => {
-    const root = ready({ railVersion: '2.0' })
+    const root = ready()
     rail(root, 'advance', 'check')
     rehearse(root, 'M0', [ITEMS[0]])
     rail(root, 'rehearsal-record', 'M0')
@@ -164,6 +157,7 @@ describe('닫힘 알림', () => {
   function toClose(cfg) {
     const root = ready(cfg)
     rail(root, 'advance', 'check')
+    markRehearsed(root)
     rail(root, 'ask', '됐나요?', '--kind', 'approve')
     rail(root, 'answer', '됨')
     rail(root, 'log', 'rail_edit', '{"file":".rail/x","why":"y"}')
@@ -191,7 +185,7 @@ describe('닫힘 알림', () => {
     const argv = JSON.parse(readFileSync(path.join(root, 'sent.json'), 'utf8'))
     assert.deepEqual(argv.slice(0, 6), ['orchestration', 'send', '--to', 'bot:coach', '--type', 'status'])
     assert.equal(argv[argv.indexOf('--subject') + 1], 'demo M0 닫힘')
-    assert.match(argv[argv.indexOf('--body') + 1], /^작업 \d+분 · 사람 답 1번 · 레일 수정 1번$/)
+    assert.match(argv[argv.indexOf('--body') + 1], /^작업 \d+분 · 사람 답 1번 · 레일 수정 1번 · CW 모름 · 압축 0번\n빼기 후보: /)
     assert.ok(names(root).includes('notify_sent'))
   })
 

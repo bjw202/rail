@@ -31,33 +31,68 @@ describe('착수 전: 결정과 시험의 상태 말', () => {
     put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'decide', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {} } }))
     return root
   }
-  test('결정 미정이면 기획서 줄에 후보와 추천을 붙여 묻게 하고, 위임·미룸도 결정으로 본다', () => {
+  const D = { 'D-01': '결정: 선택함 (A)' }
+  test('결정 미정이면 기획서 줄에 후보와 추천을 붙여 묻게 하고, 위임·미룸(기한)도 결정으로 본다', () => {
     assert.match(next(at({})), /남은 것: D-01, T-01\. 지금: D-01 \("결정: 미정" 입니다 \(사람이 아직 고르지 않음\)\) — 기획서 D-01 줄 아래에 후보 2~3개/)
-    for (const d of ['결정: 선택함 (A)', '결정: AI가 고름(위임) (B)', '결정: 미룸(2026-12-10)']) assert.match(next(at({ 'D-01': d })), /지금: T-01 /, d)
+    for (const d of ['결정: 선택함 (A)', '결정: AI가 고름(위임) (B)', '결정: 미룸(2099-12-10)']) assert.match(next(at({ 'D-01': d })), /지금: T-01 /, d)
   })
-  test('시험 미실행·실패는 가정 시험 틀로 안내하고, 통과·판단 보류면 마일스톤을 시작한다', () => {
-    const D = { 'D-01': '결정: 선택함 (A)' }
+  test('시험 미실행·실패는 가정 시험 틀로 안내하고, 통과·판단 보류(기한)면 마일스톤을 시작한다', () => {
     assert.match(next(at({ ...D, 'T-01': '시험: 미실행' })), /가정 시험 — \.rail\/trial\/template\.md .*verify 에 넣는다$/)
     assert.match(next(at({ ...D, 'T-01': '시험: 실패 · 30MB 9초' })), /"시험: 실패" 입니다 .*지금 실패라 다른 방법을 시험하거나 그 장면의 착수 전에서 빼고 범위를 줄인다/)
-    for (const t of ['시험: 통과(작은 예제 범위까지만) · 1.2초 · 감수: 첫 화면 빈칸', '시험: 판단 보류(2026-12-01)']) assert.match(next(at({ ...D, 'T-01': t })), /M0 착수 전 결정·시험이 모두 풀렸습니다/, t)
+    for (const t of ['시험: 통과 · 0.4초', '시험: 통과(작은 예제 범위까지만) · 1.2초 · 감수: 첫 화면 빈칸', '시험: 판단 보류(2099-12-01)']) assert.match(next(at({ ...D, 'T-01': t })), /M0 착수 전 결정·시험이 모두 풀렸습니다/, t)
+  })
+  test('상태 말은 정해진 말과 정확히 맞아야 하고, 기한 없는·지난 미룸과 판단 보류는 풀린 것이 아니다', () => {
+    const cases = [
+      [{ ...D, 'T-01': '시험: 통과 못함 · 9초' }, /T-01 \("시험: 통과 못함" 입니다 \(아직 시험하지 않음\)\)/],
+      [{ ...D, 'T-01': '시험: 판단 보류' }, /T-01 \("시험: 판단 보류" 입니다 \(기한을 "\(2026-12-01\)" 꼴로 붙인다\)\)/],
+      [{ ...D, 'T-01': '시험: 판단 보류(2020-01-01)' }, /T-01 \("시험: 판단 보류\(2020-01-01\)" 의 기한 2020-01-01 이 지났습니다/],
+      [{ 'D-01': '결정: 미룸', 'T-01': '시험: 통과' }, /D-01 \("결정: 미룸" 입니다 \(기한을/],
+      [{ 'D-01': '결정: 미룸(2020-01-01)', 'T-01': '시험: 통과' }, /D-01 \("결정: 미룸\(2020-01-01\)" 의 기한 2020-01-01 이 지났습니다/],
+      [{ 'D-01': '결정: 선택함인 듯', 'T-01': '시험: 통과' }, /D-01 \("결정: 선택함인 듯" 입니다/]
+    ]
+    for (const [marks, re] of cases) assert.match(next(at(marks)), re, JSON.stringify(marks))
+  })
+  test('advance milestone 은 미리 승인과 같은 판정으로 풀리지 않은 착수 전 항목이 있으면 막고, 풀리면 시작한다', () => {
+    for (const t of ['시험: 미실행', '시험: 실패 · 30MB 9초', '시험: 통과 못함', '시험: 판단 보류(2020-01-01)']) {
+      const root = at({ ...D, 'T-01': t })
+      const r = rail(root, 'advance', 'milestone')
+      assert.equal(r.code, 1, t)
+      assert.match(r.err, /착수 전 T-01 가 풀리지 않았습니다/, t)
+      assert.equal(state(root).stage, 'decide')
+      assert.deepEqual(state(root).gates.risks_decided, {}, '실패한 시험 번호를 풀린 것으로 남기지 않는다')
+    }
+    const root = at({ ...D, 'T-01': '시험: 통과 · 0.4초' })
+    assert.equal(rail(root, 'advance', 'milestone').code, 0)
+    assert.deepEqual([state(root).stage, state(root).gates.risks_decided.M0, state(root).gates.plan_marks.M0], ['milestone', ['D-01', 'T-01'], ['D-01', 'T-01']])
   })
 })
 
-describe('살아 있는 세 줄', () => {
-  const closing = (living) => {
+describe('살아 있는 세 줄과 계획 밖 결정 수', () => {
+  const closing = (living, marks = ['D-01']) => {
     const root = tmp()
-    put(root, 'docs/PLAN.md', planDoc([['M0'], ['M1']]) + living)
+    put(root, 'docs/PLAN.md', planDoc([['M0', 'D-01', 'D-02', 'T-02'], ['M1']], { 'D-01': '결정: 선택함 (A)', 'D-02': '결정: 선택함 (B)', 'T-02': '시험: 통과' }) + living)
     put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 파일 | 완료 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 기능 | a | b | c | ✅ 끝(2026-11-26) 됨 |\n')
-    put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: { M0: { result: 'pass', note: '봤다' } } } }))
+    put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { plan_marks: { M0: marks }, scene_checked: { M0: { result: 'pass', note: '봤다' } } } }))
     return root
   }
-  test('닫기 전에 이 마일스톤 기준으로 고치라고 알리고, 고친 뒤에는 바로 닫기를 안내한다(관문은 아니다)', () => {
-    const old = closing('## 살아 있는 세 줄\n- 깨진 가정: 없음\n- 계획 밖 결정: 0번 · 계획 변경: 없음\n- 다음 장면: S1\n')
-    assert.match(next(old), /^M0 를 닫습니다 — 먼저 기획서 "## 살아 있는 세 줄"을 M0 기준으로 고친다/)
+  test('닫기 전에 코드가 센 수로 세 줄을 고치라고 알리고, 고친 뒤에는 바로 닫기를 안내한다(관문은 아니다)', () => {
+    const old = closing('## 살아 있는 세 줄\n- 깨진 가정: 없음\n- 계획 밖 결정: 아직 없음 · 계획 변경: 없음\n- 다음 장면: S1\n')
+    assert.match(next(old), /^M0 를 닫습니다 — 먼저 기획서 "## 살아 있는 세 줄"을 M0 기준으로 고친다\(.*- 계획 밖 결정: 누적 2번 \(M0 2\)/)
+    assert.match(rail(old, 'status').out, /\n기획 성적: 계획 밖 결정 이번\(M0\) 2 · 누적 2 \(코드가 셈\)\n/)
     const now = closing('## 살아 있는 세 줄\n- 깨진 가정: 없음 (M0)\n- 계획 밖 결정: 2번 (M0 2) · 계획 변경: M1 을 둘로 나눔\n- 다음 장면: S2 목록이 보인다\n')
     assert.match(next(now), /^M0 를 닫습니다 — advance close\./)
-    assert.match(rail(now, 'status').out, /\n기획 성적: 계획 밖 결정 2번\n/)
-    assert.equal(rail(now, 'advance', 'close').code, 0)
-    assert.equal(events(now).find((e) => e.event === 'milestone_closed').grade, '2번')
+    const r = rail(now, 'advance', 'close')
+    assert.equal(r.code, 0)
+    assert.match(r.out, /\[기획 성적\] 계획 밖 결정 이번\(M0\) 2 · 누적 2 \(코드가 셈\)/)
+    const closed = events(now).find((e) => e.event === 'milestone_closed')
+    assert.deepEqual([closed.grade, closed.unplanned], ['2번', { now: 2, total: 2 }])
+    assert.deepEqual(state(now).gates.unplanned, { M0: 2 })
+    assert.match(rail(now, 'status').out, /\n기획 성적: 계획 밖 결정 이번\(M0\) 2 · 누적 2 \(코드가 셈\)/, '닫은 뒤 다음 시작 전에는 마지막으로 닫은 마일스톤을 보인다')
+  })
+  test('리더가 적은 누적 수가 코드가 센 수와 다르면 차이를 보인다', () => {
+    const root = closing('## 살아 있는 세 줄\n- 깨진 가정: 없음 (M0)\n- 계획 밖 결정: 1번 (M0 1) · 계획 변경: 없음\n- 다음 장면: S2\n', ['D-01', 'D-02'])
+    assert.match(rail(root, 'status').out, /기획 성적: 계획 밖 결정 이번\(M0\) 1 · 누적 1 \(코드가 셈\)\n/)
+    const off = closing('## 살아 있는 세 줄\n- 깨진 가정: 없음 (M0)\n- 계획 밖 결정: 0번 (M0 0) · 계획 변경: 없음\n- 다음 장면: S2\n')
+    assert.match(rail(off, 'status').out, /기획 성적: 계획 밖 결정 이번\(M0\) 2 · 누적 2 \(코드가 셈, 기획서에 적은 누적 0번과 2 차이\)/)
   })
 })

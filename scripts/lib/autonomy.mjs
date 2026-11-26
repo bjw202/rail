@@ -123,5 +123,5 @@ export function cmdNext({ flags }) {
     out(`  마일스톤 상한: ${usd(b.milestone.limit)} (지난 ${b.milestone.past.length}개 중간값 ${usd(b.milestone.median)} × ${b.milestone.times})${b.milestone.milestone ? ` · ${b.milestone.milestone} 에 쓴 돈 ${usd(b.milestone.spent)}` : ''}`)
   if (b?.milestone?.note) out(`  마일스톤: ${b.milestone.note}`)
   if (b?.daily) out(`  오늘: ${usd(b.daily.spent)} / 상한 ${usd(b.daily.limit)}`)
-  if (b?.error) out(`  ${b.error}`)
+  if (b?.error || b?.note) out(`  ${b.error ?? b.note}`)
 }

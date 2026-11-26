@@ -156,6 +156,7 @@ function closeRoot(cfg = {}) {
   put(root, 'docs/PLAN.md', DECIDED_PLAN)
   put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 완료 기준 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | 가 | src/a.mjs | 기준 | ✅ 끝(2026-11-24) 됨 |\n')
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: { M0: { result: 'pass', note: '봤다' } }, rehearsed: {} } }))
+  git(root, 'init', '-q')
   return { root, env: { ORCA_CLI_COMMAND: fake } }
 }
 const sentBody = (root) => {

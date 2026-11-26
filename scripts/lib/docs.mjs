@@ -67,15 +67,33 @@ export function sheetProblems(sh = readSheet()) {
   return p
 }
 
-// 착수 전 항목 하나: 결정(D)은 선택함·AI가 고름(위임)·미룸(기한), 시험(T)은 통과·판단 보류(기한)면 시작해도 된다.
+// 착수 전 항목 하나: 결정(D)은 선택함 (<고른 것>)·AI가 고름(위임)·미룸(<기한>), 시험(T)은 통과·통과(작은 예제 범위까지만)·판단 보류(<기한>)일 때만 시작해도 된다.
+// 상태 말은 정해진 말과 정확히 맞아야 한다("통과 못함"은 통과가 아니다). 기한이 지난 미룸·판단 보류는 다시 막는다.
+const OK_D = /^(?:선택함|AI\s*가\s*고름\s*\(위임\))(?:\s*\(.*\))?$|^미룸\s*\((\d{4}-\d{2}-\d{2})\)$/
+const OK_T = /^통과(?:\s*\(작은 예제 범위까지만\))?$|^판단\s*보류\s*\((\d{4}-\d{2}-\d{2})\)$/
 export function decisionStatus(id, sh = readSheet()) {
   const line = sh?.marks.find((x) => x.id === id)?.line
-  const d = id.startsWith('D')
+  const [d, k] = id.startsWith('D') ? [true, '결정'] : [false, '시험']
   if (!line) return { id, ok: false, why: '기획서 "## 결정과 시험" 에 이 줄이 없습니다' }
-  const s = line.match(d ? /결정\s*[:：]\s*([^·]+)/ : /시험\s*[:：]\s*([^·]+)/)?.[1].trim() ?? ''
-  if (d ? /^(선택함|AI\s*가\s*고름|미룸)/.test(s) : /^(통과|판단\s*보류)/.test(s)) return { id, ok: true }
-  return { id, ok: false, why: !s ? `"${d ? '결정' : '시험'}:" 칸이 없습니다` : `"${d ? '결정' : '시험'}: ${s}" 입니다 (${d ? '사람이 아직 고르지 않음' : /^실패/.test(s) ? '다른 방법을 시험하거나 착수 전에서 빼고 범위를 줄인다' : '아직 시험하지 않음'})` }
+  const s = line.match(new RegExp(`${k}\\s*[:：]\\s*([^·]+)`))?.[1].trim() ?? ''
+  const m = s.match(d ? OK_D : OK_T)
+  if (m && !(m[1] && m[1] < today())) return { id, ok: true }
+  const why = !s ? `"${k}:" 칸이 없습니다` : m ? `"${k}: ${s}" 의 기한 ${m[1]} 이 지났습니다 (다시 정하거나 기한을 새로 붙인다)` : `"${k}: ${s}" 입니다 (${/^(?:미룸|판단\s*보류)/.test(s) ? '기한을 "(2026-12-01)" 꼴로 붙인다' : d ? '사람이 아직 고르지 않음' : /^실패/.test(s) ? '다른 방법을 시험하거나 착수 전에서 빼고 범위를 줄인다' : '아직 시험하지 않음'})`
+  return { id, ok: false, why }
 }
+// 마일스톤의 착수 전 항목 중 풀리지 않은 것. 바로 시작(advance milestone)과 미리 승인(plan approve)이 같은 판정을 쓴다.
+export const openRisks = (id, sh = readSheet()) => (sh?.ms.find((x) => x.id === id)?.risks ?? []).map((r) => decisionStatus(r, sh)).filter((d) => !d.ok)
+// 계획 밖 결정 수: 마일스톤 시작 때 남긴 "결정과 시험" 번호(gates.plan_marks)에 없던 번호의 수. 닫으면 gates.unplanned 에 남는다.
+// 돌려주는 값: { id, now, total, said }  id·now = 지금(시작한 뒤면 지금 마일스톤, 아니면 마지막으로 닫은 것), total = 누적, said = 기획서에 리더가 적은 누적 수.
+export function unplanned(st, sh = readSheet()) {
+  const base = st.gates.plan_marks?.[st.milestone]
+  const counted = { ...(st.gates.unplanned ?? {}), ...(base && !st.closed.includes(st.milestone) ? { [st.milestone]: new Set((sh?.marks ?? []).map((x) => x.id).filter((x) => !base.includes(x))).size } : {}) }
+  const id = base ? st.milestone : st.closed.findLast((x) => x in counted)
+  if (!id) return null
+  const said = sh?.grade?.match(/\d+/)?.[0]
+  return { id, now: counted[id], total: Object.values(counted).reduce((a, b) => a + b, 0), said: said === undefined ? null : Number(said) }
+}
+export const gradeLine = (g) => g && `이번(${g.id}) ${g.now} · 누적 ${g.total} (코드가 셈${g.said !== null && g.said !== g.total ? `, 기획서에 적은 누적 ${g.said}번과 ${Math.abs(g.total - g.said)} 차이` : ''})`
 export const cardFile = (id) => (fs.existsSync(F.decisions) ? fs.readdirSync(F.decisions).find((n) => n.startsWith(id + '.') || n.startsWith(id + '-')) ?? null : null)
 
 export const nextOpenMilestone = (st, sh) => sh?.ms.find((m) => !st.closed.includes(m.id))?.id ?? null

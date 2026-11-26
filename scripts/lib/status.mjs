@@ -1,7 +1,8 @@
 // 위치와 "다음 할 일" 문구: status, precompact 명령.
 import { autonomy, autonomyOn, commitPolicy, loadConfig, railVersion, versionLabel } from './config.mjs'
 import { PLUGIN, RAIL_CMD, out, strList, today } from './core.mjs'
-import { decisionStatus, nextOpenMilestone, readSheet, sheetProblems } from './docs.mjs'
+import { NO_COST } from './budget.mjs'
+import { gradeLine, nextOpenMilestone, openRisks, readSheet, sheetProblems, unplanned } from './docs.mjs'
 import { featureHint } from './check.mjs'
 import { disabledParts, partOff } from './parts.mjs'
 import { activeRows, isActive, isDone, isFeatureRole, isFixRole, isImplRole, isReviewRole, isTestRole, planProblems, planViolations, readPlan, startable, stepList } from './plan.mjs'
@@ -49,7 +50,12 @@ export function cardHint(d, m, st) {
   return `기획서 ${id} 줄 아래에 후보 2~3개(하나는 가장 단순한 안, 후보마다 결과와 깨지는 장면 한 줄)와 추천을 붙여 보이고 ask "${id} 는 A/B/C 중 무엇으로 할까요? (추천대로도 됩니다)" --kind decide 로 묻고 턴을 끝내기. 봐야 아는 결정이면 먼저 docs/decisions/${id}-<이름>.md 시제품 카드("# ${id} (질문 제목)" / "마일스톤: ${m}" / "시제품: 예" / "## 질문" / "## 변주"(- p1-이름: 한두 줄, 2~3개) / "## 스크린샷"(- d-1124.png: 2026-11-24, 데스크톱 폭 1280))를 쓰고 /rail 을 다시 본다. ${after}`
 }
 // 닫기 전 기획서 "## 살아 있는 세 줄"을 이 마일스톤으로 고쳤는가(줄에 Mx 가 있는가). 관문은 아니고 다음 할 일만 알려 준다.
-const livingHint = (sh, m) => (new RegExp(`\\b${m}\\b`).test(sh?.living.join('\n') ?? '') ? '' : `먼저 기획서 "## 살아 있는 세 줄"을 ${m} 기준으로 고친다(- 깨진 가정: / - 계획 밖 결정: <누적 N번> (${m} <이번 수>) · 계획 변경: / - 다음 장면:, 계획 밖 결정 = 기획서 결정과 시험에 없던 것을 이번에 새로 정한 수). 그다음 `)
+// 계획 밖 결정 수는 코드가 센 값(docs.mjs unplanned)을 적게 한다.
+const livingHint = (sh, m, st) => {
+  if (new RegExp(`\\b${m}\\b`).test(sh?.living.join('\n') ?? '')) return ''
+  const g = unplanned(st, sh)
+  return `먼저 기획서 "## 살아 있는 세 줄"을 ${m} 기준으로 고친다(- 깨진 가정: / - 계획 밖 결정: ${g?.id === m ? `누적 ${g.total}번 (${m} ${g.now})` : `<누적 N번> (${m} <이번 수>)`} · 계획 변경: / - 다음 장면:). 그다음 `
+}
 export const SCENE_PREP = (m) =>
   `점검표 .rail/rehearsal/${m}/checklist.md 를 쓰고(0번은 "지금 화면이 오늘 빌드인가") 명세 .orchestration/${m}-rehearsal-spec.md 로 worker start ${m}-rehearsal --agent claude --role rehearsal. 리허설 작업자는 항목마다 .rail/rehearsal/${m}/<번호>.png 와 result.json({"items":[{"id":"0","check":"<항목>","result":"pass|fail","saw":"<본 숫자 한 줄>","shot":"0.png"}]})을 쓰고 rehearsal-record ${m}`
 
@@ -79,9 +85,8 @@ export function describe(st) {
     else (next = `기획서가 승인됐습니다. ${nextOpenMilestone(st, rm)} 착수 전 결정·시험으로 넘어갑니다 (advance decide --milestone ${nextOpenMilestone(st, rm)})`), (skill = 'rail')
   } else if (st.stage === 'decide') {
     pos = `${m} 시작 전 · 착수 전 결정과 시험`
-    const mm = rm?.ms.find((x) => x.id === m)
-    const open = (mm?.risks ?? []).map((id) => decisionStatus(id, rm)).filter((d) => !d.ok)
-    const unpicked = (mm?.risks ?? []).find((id) => protoCard(id)?.on && !open.some((d) => d.id === id) && !readEvents().some((e) => e.event === 'proto_picked' && e.proto === id))
+    const open = openRisks(m, rm)
+    const unpicked = (rm?.ms.find((x) => x.id === m)?.risks ?? []).find((id) => protoCard(id)?.on && !open.some((d) => d.id === id) && !readEvents().some((e) => e.event === 'proto_picked' && e.proto === id))
     const noCheck = loadConfig().checkCommand ? '' : ' · .rail/config.json 의 checkCommand 가 비었습니다. 제품 스택이 정해졌으면 채우기(예: npm test)'
     if (open.length) next = protoNext(open[0].id) ?? `착수 전 풀기 — 남은 것: ${open.map((d) => d.id).join(', ')}. 지금: ${open[0].id} (${open[0].why}) — ${cardHint(open[0], m, st)}`
     else if (unpicked) next = `시제품 정리 — 고른 변주의 화면을 기준 화면으로 옮기고 시제품 작업 공간 지우기 (proto pick ${unpicked} <변주>). 옮긴 .rail/reference/${m}/ 는 커밋에 넣는다`
@@ -136,12 +141,12 @@ export function describe(st) {
     else if (!sc && rh && selfFix(st).ok)
       next = `스스로 고치기 (${selfFix(st).n + 1}/${SELF_FIX_MAX}) — 리허설 실패 ${rh.failed.map((f) => f.id).join(', ')} 는 기계로 가릴 수 있는 항목이라 사람에게 묻기 전에 고칩니다: reopen --self-fix, 그다음 고칠 줄을 더하고 다시 리허설`
     else if (!sc && rh && pendingClose(st, rm).ok)
-      next = `장면 판정 대기로 닫기 — ${pendingClose(st, rm).why}. ${livingHint(rm, m)}advance close 로 ${m} 를 판정 대기 목록에 올리고(판정으로 고친 시험 목록도 함께) 다음 마일스톤으로 넘어간다(사람 판정은 돌아왔을 때 scene ${m} --result pass|fail --note "<본 것>")`
+      next = `장면 판정 대기로 닫기 — ${pendingClose(st, rm).why}. ${livingHint(rm, m, st)}advance close 로 ${m} 를 판정 대기 목록에 올리고(판정으로 고친 시험 목록도 함께) 다음 마일스톤으로 넘어간다(사람 판정은 돌아왔을 때 scene ${m} --result pass|fail --note "<본 것>")`
     else if (!sc && rh)
       next = `리허설 결과(스크린샷 ${rh.total}장, 통과 ${rh.pass}/${rh.total}${rh.failed.length ? `, 실패 ${rh.failed.map((f) => f.id).join(', ')} 먼저` : ''})를 사람에게 보여 주고 장면 질문하기 (ask --scene). 실패 항목과 스크린샷을 먼저, 통과 항목은 본 숫자와 경로를 한 줄씩. 출력된 질문을 그대로 보이고 턴을 끝내기`
     else if (!sc) next = '장면 점검표 띄우고 사람이 직접 해 보게 하기'
     else if (sc.result !== 'pass') next = '장면 확인이 실패로 기록됐습니다. 고칠 step 을 더하고 다시 확인합니다 (reopen). 새 줄의 상태 칸은 비우고, 새로 정할 것이 생기면 기획서 결정과 시험에 줄을 더하고 계획 밖 결정으로 센다'
-    else (next = `${m} 를 닫습니다 — ${livingHint(rm, m)}advance close. 출력의 [덜어내기]·[알림 실패] 줄을 사람에게 그대로 전하고, 바뀐 문서는 커밋 정책대로 커밋`), (skill = 'rail')
+    else (next = `${m} 를 닫습니다 — ${livingHint(rm, m, st)}advance close. 출력의 [덜어내기]·[알림 실패] 줄을 사람에게 그대로 전하고, 바뀐 문서는 커밋 정책대로 커밋`), (skill = 'rail')
   } else {
     pos = '모든 마일스톤 완료'
     const open = nextOpenMilestone(st, rm)
@@ -158,7 +163,7 @@ export function describe(st) {
   if (left) next += ` · ${left}`
   const pending = pendingScenes(st)
   if (pending.length) waiting = `${waiting === '없음' ? '' : `${waiting} · `}사람 장면 판정 대기: ${pendingText(st)} (사람이 말하면 scene <Mx> --result pass|fail --note "<본 것>")`
-  return { position: pos, waiting, next, skill, violations: v, grade: rm?.grade ?? null }
+  return { position: pos, waiting, next, skill, violations: v, grade: gradeLine(unplanned(st, rm)) ?? null }
 }
 
 
@@ -173,7 +178,8 @@ export function cmdStatus({ flags }) {
   const workers = openWorkers(st)
   const stepText = steps.length ? `\nstep (${st.milestone}):\n${steps.map((x) => `  ${x.mark} ${x.step} ${x.role}`).join('\n')}` : ''
   const workerText = workers.length ? `\n작업자: ${workers.map((w) => `${w.step}(${w.agent ?? '?'}, ${w.role ?? '?'}, 창 ${w.terminal ?? '?'}, 일 ${w.dispatch ?? '?'})`).join(', ')}` : ''
-  const text = `위치: ${d.position}\n기다리는 것: ${d.waiting}\n다음 할 일: ${d.next}${d.grade ? `\n기획 성적: 계획 밖 결정 ${d.grade}` : ''}${workerText}${stepText}`
+  const noCost = autonomyOn() && !autonomy().budget.costCommand ? `\n[경고] ${NO_COST}` : ''
+  const text = `위치: ${d.position}\n기다리는 것: ${d.waiting}\n다음 할 일: ${d.next}${d.grade ? `\n기획 성적: 계획 밖 결정 ${d.grade}` : ''}${noCost}${workerText}${stepText}`
   if (flags.hook && flags.compact) {
     softLog('compact_resumed', st, { session: input.session_id ?? null, source: input.source ?? null })
     const again = `압축됐다. docs/RAIL.md 와 지금 마일스톤의 step 표${st.milestone ? `(docs/plan/${st.milestone}.md)` : ''}를 다시 읽고, 진행 중 작업자를 \`${RAIL_CMD} status\` 로 확인한 뒤 이어서 하라.`

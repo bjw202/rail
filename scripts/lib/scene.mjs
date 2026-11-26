@@ -1,7 +1,7 @@
 // 장면 질문과 답, 장면 확인, 장면 리허설, 되돌림.
 import fs from 'node:fs'
 import path from 'node:path'
-import { autonomyOn, isV2, railVersion } from './config.mjs'
+import { autonomyOn, railVersion } from './config.mjs'
 import { F, fail, now, out, read, unquote } from './core.mjs'
 import { partOff, partSkipped } from './parts.mjs'
 import { staleList, staleText } from './stale.mjs'
@@ -100,11 +100,10 @@ export function recordScene(st, id, result, note, stale = 0) {
   if (result === 'fail') out('안 됨으로 기록했습니다. reopen 으로 step 진행 단계로 되돌리고 고칠 step 을 표에 더하세요.')
 }
 
-// 사람 장면 확인 앞의 관문: 바깥 정답 검증기(있으면)와, 2.0판이면 장면 리허설 기록.
-// check 단계 중간에 2.0판으로 바뀐 마일스톤에도 걸린다. 닫힌 마일스톤은 다시 보지 않는다.
+// 사람 장면 확인 앞의 관문: 바깥 정답 검증기(있으면)와 장면 리허설 기록.
 export function sceneProblems(st, log = false) {
   const p = [...verifyStatus(st, log).problems]
-  const need = isV2() && !st.gates.rehearsed?.[st.milestone]
+  const need = !st.gates.rehearsed?.[st.milestone]
   if (need && partOff('rehearsal')) {
     if (log) partSkipped('rehearsal', st, { where: 'scene' })
   } else if (need)

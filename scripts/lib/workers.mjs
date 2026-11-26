@@ -70,6 +70,8 @@ export function agentCommand(agent, name, testEdit = false) {
   if (agent === 'codex') return `${env}codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false`
   return `${env}claude --model opus --dangerously-skip-permissions --name ${shq(name)}`
 }
+const EXT = process.platform === 'win32' ? (process.env.PATHEXT ?? '.EXE;.CMD').split(';') : ['']
+export const onPath = (bin) => (process.env.PATH ?? '').split(path.delimiter).some((d) => d && EXT.some((x) => fs.existsSync(path.join(d, bin + x))))
 // 2.6판: 이 마일스톤에서 step 이름과 시험 고치기(RAIL_ALLOW_TEST_EDIT 또는 "시험 고치")가 든 질문에 사람이 허락했으면
 // { at, by: 'human' }. 허락 한 번에 작업자 하나다(그 뒤 test_edit 로 띄운 worker_start 가 있으면 다 쓴 것).
 // 사람 허락이 없고 staleTests 가 agent 면 판정 작업자의 판정을 본다(stale.mjs: 허락 또는 { refused }).
@@ -102,9 +104,15 @@ export function cmdWorker({ pos, flags }) {
 }
 
 export function workerStart(steps, flags, usage) {
-  const agent = flags.agent
+  let agent = flags.agent
   const role = typeof flags.role === 'string' ? flags.role.trim() : ''
   if (!['claude', 'codex'].includes(agent) || !role) fail(usage, 2)
+  // Codex 가 없으면 Claude 로 대신 띄운다. 다른 회사 모델의 시각은 없어진다.
+  if (agent === 'codex' && !onPath('codex')) {
+    agent = 'claude'
+    out(`[경고] codex 명령이 PATH 에 없어 ${steps.join(', ')} 를 Claude 작업자로 띄웁니다 (다른 회사 모델 시각 없음)`)
+    withLock(() => appendLog('codex_missing', loadState(), { steps, role, note: '다른 회사 모델 시각 없음' }))
+  }
   if (flags['spec-file'] && steps.length > 1) fail('--spec-file 은 step 하나일 때만 씁니다. 여러 step 이면 .orchestration/<step>-spec.md 를 읽습니다.', 2)
   // 먼저 모두 확인하고, 하나라도 틀리면 아무 창도 띄우지 않는다.
   const plans = withLock(() => {

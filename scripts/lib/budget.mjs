@@ -7,8 +7,11 @@ import { ROOT, childEnv, clock, lastLines, median, now, usd } from './core.mjs'
 export const PROGRESS = new Set(['step_done', 'stage_advance', 'milestone_closed', 'scene_check'])
 
 // 예산 규칙 셋을 잰다. 비용은 costCommand 를 한 번 불러 모든 구간을 함께 잰다. 읽지 못하면 { error }.
+// costCommand 가 비었으면 예산 규칙을 쓰지 않는다(멈추지 않고 status 가 경고한다). 있는데 실패하면 { error } 로 멈춘다.
+export const NO_COST = '비용 명령(autonomy.budget.costCommand)이 비어 예산 규칙을 쓰지 않습니다'
 export function budgetStatus(st, ev, a, cache) {
   const rules = a.budget
+  if (!rules.costCommand) return { rules: {}, over: null, note: NO_COST }
   const lim = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null)
   const on = {
     sinceProgress: rules.sinceProgress.on === true && lim(rules.sinceProgress.usd) !== null,
@@ -73,7 +76,6 @@ export function budgetStatus(st, ev, a, cache) {
 // cwd 를 주면(2.4판 시제품) 그 작업 공간의 기록만 잰다. 그렇게 재는 명령은 출력에 같은 cwd 를 돌려준다.
 export function readCost(intervals, cwd = null) {
   const cmd = autonomy().budget.costCommand
-  if (!cmd) return { error: '비용을 잴 명령(autonomy.budget.costCommand)이 비어 있습니다' }
   const t0 = Date.now()
   const r = spawnSync(cmd, { shell: true, cwd: ROOT, input: JSON.stringify({ intervals, ...(cwd ? { cwd } : {}) }), encoding: 'utf8', env: { ...childEnv(), RAIL_ROOT: ROOT }, timeout: 45_000, maxBuffer: 16 * 1024 * 1024 })
   if (r.error || r.status !== 0) return { error: `비용 읽기 실패(${r.error?.message ?? (lastLines(r.stderr || r.stdout, 2).join(' / ') || `종료 코드 ${r.status}`)})` }

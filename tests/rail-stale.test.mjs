@@ -137,7 +137,7 @@ function checkRoot(withStale = true) {
   put(root, '.rail/config.json', JSON.stringify({ staleTests: 'agent' }))
   put(root, 'docs/PLAN.md', GOOD_PLAN)
   put(root, 'docs/plan/M0.md', `${HEAD}| M0-1 | 구현 | 가 | src/a.mjs | 없음 | 기준 | ✅ 끝(2026-11-25) 됨 |\n`)
-  put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: {} } }))
+  put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: { M0: { pass: 1, total: 1, failed: [] } } } }))
   const ev = { t: '2026-11-25T00:00:00.000Z', event: 'worker_start', stage: 'milestone', milestone: 'M0', step: 'M0-1', test_edit: true, allowed_by: 'stale', stale_file: '.rail/stale/M0-1.json', stale_lines: [{ file: 'tests/a.test.mjs', line: 3, pinned: '합계 $3.20', changed_by: 'M0-1 할 일 "합계 칸 바꾸기"' }] }
   if (withStale) put(root, '.rail/log.jsonl', JSON.stringify(ev) + '\n')
   return root

@@ -1,7 +1,7 @@
 // 부품 쓰임 세기, 빼기 후보, 레일 크기.
 import fs from 'node:fs'
 import path from 'node:path'
-import { atLeast, railVersion, versionLabel } from './config.mjs'
+import { railVersion, versionLabel } from './config.mjs'
 import { F, PLUGIN, fail, out, walk } from './core.mjs'
 import { PARTS, PART_IDS, disabledParts, insurance, partOff, partSkipped, writeDisabled } from './parts.mjs'
 import { appendLog, loadState, lock, readEvents, unlock } from './state.mjs'
@@ -87,7 +87,7 @@ export function afterClose(st, id, off) {
   out(`[덜어내기] 꺼 둔 부품 ${off.join(', ')} 을(를) 다시 켰습니다. ${id} 의 리뷰·리허설·장면에서 이 부품이 막았어야 할 결함이 나왔는지 사람이 봅니다.`)
 }
 
-// ---------- 레일 크기 (2.3판) ----------
+// ---------- 레일 크기 ----------
 // 레일 = 플러그인의 scripts, hooks, skills/rail* 과 프로젝트의 docs/RAIL.md. 판 번호가 바뀌는 첫 명령 때 rail_size 를 한 번 남긴다.
 export function railSize() {
   const files = []
@@ -100,7 +100,7 @@ export function railSize() {
   return { lines, files: files.length }
 }
 export function noteRailSize() {
-  if (!atLeast(2.3) || !fs.existsSync(F.state) || !lock(2000, true)) return
+  if (!fs.existsSync(F.state) || !lock(2000, true)) return
   try {
     const v = railVersion()
     const last = readEvents().findLast((e) => e.event === 'rail_size')

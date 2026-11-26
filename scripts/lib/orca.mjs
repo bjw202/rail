@@ -1,9 +1,11 @@
-// Orca CLI 부르기를 한 곳에 모은다(2.9판). ORCA_CLI_COMMAND 가 있으면 그것을 부른다(시험의 가짜 orca).
+// Orca CLI 부르기를 한 곳에 모은다. ORCA_CLI_COMMAND 가 있으면 그것을 부른다(시험의 가짜 orca).
 import { spawnSync } from 'node:child_process'
 import { lastLines } from './core.mjs'
 
 export function orca(args, timeout = 90_000) {
-  const r = spawnSync(process.env.ORCA_CLI_COMMAND || 'orca', args, { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 })
+  const bin = process.env.ORCA_CLI_COMMAND || 'orca'
+  // .mjs 가짜 orca 는 node 로 부른다(Windows 는 #! 줄을 읽지 않는다).
+  const r = /\.m?js$/.test(bin) ? spawnSync(process.execPath, [bin, ...args], { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 }) : spawnSync(bin, args, { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 })
   let json = null
   try {
     json = JSON.parse(r.stdout)

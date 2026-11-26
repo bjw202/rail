@@ -1,8 +1,8 @@
 // check·advance 명령과 마일스톤 닫힘 알림.
-import { atLeast, loadConfig } from './config.mjs'
+import { loadConfig } from './config.mjs'
 import { fail, now, out } from './core.mjs'
 import { orca } from './orca.mjs'
-import { approvalDate, markClosed, nextOpenMilestone, readSheet } from './docs.mjs'
+import { approvalDate, gradeLine, markClosed, nextOpenMilestone, readSheet, unplanned } from './docs.mjs'
 import { gate } from './gates.mjs'
 import { staleList, withCommit } from './stale.mjs'
 import { disabledParts } from './parts.mjs'
@@ -38,6 +38,7 @@ export function cmdCheck({ pos, flags }, advance) {
     st.step = null
   } else if (target === 'milestone') {
     st.gates.risks_decided[st.milestone] = rm.ms.find((m) => m.id === st.milestone).risks
+    st.gates.plan_marks = { ...st.gates.plan_marks, [st.milestone]: [...new Set(rm.marks.map((x) => x.id))] }
     st.stage = 'milestone'
   } else if (target === 'check') {
     st.stage = 'check'
@@ -51,8 +52,11 @@ export function cmdCheck({ pos, flags }, advance) {
     // 판정으로 고친 시험 목록(커밋 포함)을 붙여 둔다. 닫으면 지금 마일스톤이 바뀌어 사건 기록에서 다시 모으지 못한다.
     const sl = staleList(st).map(withCommit)
     if (!st.gates.scene_checked[closedId]) st.gates.scene_pending = { ...(st.gates.scene_pending ?? {}), [closedId]: { at: now(), ...(rh ? { rehearsal: { pass: rh.pass, total: rh.total } } : {}), ...(sl.length ? { stale: sl } : {}) } }
+    const g = unplanned(st, rm)
+    if (g?.id === closedId) st.gates.unplanned = { ...st.gates.unplanned, [closedId]: g.now }
     st.closed.push(st.milestone)
-    appendLog('milestone_closed', st, { scene: st.gates.scene_checked[st.milestone], sheet_marked: markClosed(st.milestone), grade: rm?.grade ?? null })
+    appendLog('milestone_closed', st, { scene: st.gates.scene_checked[st.milestone], sheet_marked: markClosed(st.milestone), grade: rm?.grade ?? null, unplanned: g?.id === closedId ? { now: g.now, total: g.total } : null })
+    if (g?.id === closedId) out(`[기획 성적] 계획 밖 결정 ${gradeLine(g)}`)
     const next = nextOpenMilestone(st, rm)
     st.stage = next ? 'decide' : 'done'
     st.milestone = next
@@ -63,7 +67,7 @@ export function cmdCheck({ pos, flags }, advance) {
   appendLog('stage_advance', st, { from, to: st.stage })
   out(`[관문] 통과. 단계: ${from} → ${st.stage}${st.milestone ? ` (${st.milestone})` : ''}`)
   if (closedId) notifyClosed(st, closedId, offAtClose)
-  if (closedId && atLeast(2.3)) afterClose(st, closedId, offAtClose)
+  if (closedId) afterClose(st, closedId, offAtClose)
 }
 
 // 마일스톤 닫힘 알림: config 의 notify 가 { bot } 이면 Orca 로 한 줄 요약을 보낸다. 실패해도 닫기는 그대로 성공이다.
@@ -74,8 +78,7 @@ export function closeSummary(id, st, off = []) {
   const time = min >= 60 ? `${Math.floor(min / 60)}시간 ${min % 60}분` : `${min}분`
   const count = (name) => ev.filter((e) => e.event === name).length
   const head = `작업 ${time} · 사람 답 ${count('human_answer')}번 · 레일 수정 ${count('rail_edit')}번`
-  if (!atLeast(2.3)) return head
-  // 2.3판: 리더의 컨텍스트 사용률과 압축 횟수, 빼기 후보, 이 마일스톤 동안 꺼 둔 부품.
+  // 리더의 컨텍스트 사용률과 압축 횟수, 빼기 후보, 이 마일스톤 동안 꺼 둔 부품.
   const cw = contextPercent(st.leader_session)
   const lines = [`${head} · ${cw === null ? 'CW 모름' : `CW ${cw}%`} · 압축 ${count('compact_started')}번`, candidateLine(usage(st).candidates)]
   if (off.length) lines.push(`꺼 둔 부품: ${off.join(', ')} — 리뷰·리허설·장면에서 이 부품이 막았어야 할 결함이 나왔는지 봐 주세요`)

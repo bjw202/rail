@@ -23,7 +23,7 @@ const ok = (r) => assert.equal(r.code, 0, `${r.out}\n${r.err}`)
 // 닫기 직전(check 단계, 장면 확인 pass, step 모두 ✅)인 저장소. 기획서에 "다시 잰 예상" 절이 없다.
 function closeRoot() {
   const root = tmp('rail26c-')
-  put(root, '.rail/config.json', JSON.stringify({ railVersion: '2.6' }))
+  put(root, '.rail/config.json', '{}')
   put(root, 'docs/PLAN.md', GOOD_PLAN)
   put(root, 'docs/PLAN.md', DECIDED_PLAN)
   put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 완료 기준 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | 가 | src/a.mjs | 기준 | ✅ 끝(2026-11-24) 됨 |\n')
@@ -54,13 +54,13 @@ describe('닫기 관문: 다시 잰 예상', () => {
   })
 })
 
-// 장면 질문이 열린 check 단계 저장소(1.x판처럼 리허설·검증기 요구 없이 판정만 본다).
+// 장면 질문이 열린 check 단계 저장소(리허설은 끝났고 검증기는 없다).
 function sceneRoot() {
   const root = tmp('rail26s-')
   put(root, '.rail/config.json', '{}')
   put(root, 'docs/PLAN.md', GOOD_PLAN)
   put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 완료 기준 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | 가 | src/a.mjs | 기준 | ✅ 끝(2026-11-24) 됨 |\n')
-  put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: {} } }))
+  put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: { M0: { pass: 1, total: 1, failed: [] } } } }))
   ok(run(root, ['ask', '--scene']))
   return root
 }
@@ -86,6 +86,8 @@ describe('장면 답 앞뒤 따옴표', () => {
 })
 
 // 가짜 Orca CLI: 부른 인자를 calls.jsonl 에 남기고 창 나누기·일 맡기기·결과 읽기·닫기에 답한다.
+// PATH 에 codex 만 있는 폴더(진짜 codex 가 없는 컴퓨터에서도 같게).
+const codexBin = (root) => (put(root, 'bin-codex/codex', ''), put(root, 'bin-codex/codex.cmd', ''), path.join(root, 'bin-codex'))
 function fakeOrca(root) {
   const dir = path.join(root, 'fake')
   put(root, 'fake/layout.json', JSON.stringify({ type: 'terminal', handle: 'term_leader', title: '리더' }))
@@ -167,7 +169,7 @@ describe('사람이 허락한 시험 고치기 작업자', () => {
     ]) {
       const { root, orca } = workerRoot()
       askAnswer(root, orca.env, q, a)
-      ok(run(root, ['worker', 'start', 'M0-1', '--agent', 'codex', '--role', 'test'], orca.env))
+      ok(run(root, ['worker', 'start', 'M0-1', '--agent', 'codex', '--role', 'test'], { ...orca.env, PATH: codexBin(root) }))
       assert.ok(!orca.commands()[0].includes('RAIL_ALLOW_TEST_EDIT'), `${q} / ${a}`)
       assert.ok(!events(root).some((e) => e.event === 'worker_start' && e.test_edit))
     }
@@ -176,7 +178,7 @@ describe('사람이 허락한 시험 고치기 작업자', () => {
   test('Codex 작업자에도 같은 자리에 붙인다', () => {
     const { root, orca } = workerRoot()
     askAnswer(root, orca.env, 'M0-2 에서 시험 고치기를 허락할까요?', '진행해')
-    ok(run(root, ['worker', 'start', 'M0-2', '--agent', 'codex', '--role', 'test'], orca.env))
+    ok(run(root, ['worker', 'start', 'M0-2', '--agent', 'codex', '--role', 'test'], { ...orca.env, PATH: codexBin(root) }))
     assert.ok(orca.commands()[0].startsWith(`${ENV}codex --dangerously-bypass-approvals-and-sandbox`))
   })
 })

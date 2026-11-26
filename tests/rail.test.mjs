@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { rmSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
-import { DECIDED_PLAN, GOOD_PLAN, events, put, rail, state, tmp } from './helpers.mjs'
+import { DECIDED_PLAN, GOOD_PLAN, events, markRehearsed, put, rail, railRepo, state, tmp } from './helpers.mjs'
 
 test('빈 상태: status 가 세 줄을 내고 다음 할 일이 기획 인터뷰다', () => {
   const root = tmp()
@@ -16,7 +16,7 @@ test('빈 상태: status 가 세 줄을 내고 다음 할 일이 기획 인터�
 })
 
 test('status --hook 은 SessionStart 형식의 JSON 을 낸다', () => {
-  const j = JSON.parse(rail(tmp(), 'status', '--hook').out)
+  const j = JSON.parse(rail(railRepo(), 'status', '--hook').out)
   assert.match(j.systemMessage, /기획 · 인터뷰/)
   assert.equal(j.hookSpecificOutput.hookEventName, 'SessionStart')
   assert.match(j.hookSpecificOutput.additionalContext, /\/rail/)
@@ -67,6 +67,8 @@ test('마일스톤 한 바퀴: step 이 끝나야 check, 장면 확인이 있어
   const blocked = rail(root, 'advance', 'close')
   assert.equal(blocked.code, 1)
   assert.match(blocked.err, /사람 장면 확인 기록이 없습니다/)
+  assert.match(rail(root, 'scene', 'M0', '--result', 'pass', '--note', '됨').err, /장면 리허설 기록이 없습니다/)
+  markRehearsed(root)
   assert.equal(rail(root, 'scene', 'M0', '--result', 'pass').code, 1, '느낀 점 없이는 기록하지 않는다')
   assert.equal(rail(root, 'scene', 'M0', '--result', 'pass', '--note', '됨. 처음 열 때 3초').code, 0)
   assert.equal(rail(root, 'advance', 'close').code, 0)
@@ -83,6 +85,7 @@ test('장면 확인이 fail 이면 닫을 수 없고, reopen 으로 되돌린다
   rail(root, 'advance', 'milestone')
   put(root, 'docs/plan/M0.md', '| M0-1 | 구현 | a | b | c | 끝 |\n')
   rail(root, 'advance', 'check')
+  markRehearsed(root)
   rail(root, 'scene', 'M0', '--result', 'fail', '--note', '그림이 안 보임')
   assert.match(rail(root, 'check', 'close').err, /"fail" 로 기록/)
   assert.equal(rail(root, 'reopen').code, 0)
@@ -115,17 +118,14 @@ test('ask/answer: 질문은 한 번에 하나, 개수 상한 없이 세고 세 �
   assert.ok(Date.parse(ans.t) > 0)
 })
 
-test('log 와 request: 임의 사건과 change/bug 요청을 남긴다', () => {
+test('log: 임의 사건을 남긴다. request 명령은 없다(사용법 오류 2)', () => {
   const root = tmp()
   assert.equal(rail(root, 'log', 'worker_start', '{"step":"M0-1","agent":"claude"}').code, 0)
   assert.equal(rail(root, 'log', 'note', '그냥 글').code, 0)
-  const r = rail(root, 'request', 'change', 'HTML 도 열고 싶어')
-  assert.match(r.out, /아직 없/)
   const ev = events(root)
   assert.equal(ev[0].step, 'M0-1')
   assert.equal(ev[1].note, '그냥 글')
-  assert.deepEqual([ev[2].event, ev[2].kind, ev[2].text], ['rail_request', 'change', 'HTML 도 열고 싶어'])
-  assert.equal(rail(root, 'request', 'nope', 'x').code, 2)
+  assert.equal(rail(root, 'request', 'change', 'HTML 도 열고 싶어').code, 2)
 })
 
 test('알 수 없는 명령은 사용법 오류(2)', () => {

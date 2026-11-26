@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -43,6 +43,13 @@ export function planDoc(ms = [['M0', 'D-01'], ['M1']], marks = {}, approved = tr
 export const GOOD_PLAN = planDoc()
 export const DECIDED_PLAN = planDoc(undefined, { 'D-01': '결정: 선택함 (A)' })
 
+// 장면 리허설 기록을 상태에 바로 넣는다(리허설 작업자 없이 장면 확인을 시험할 때).
+export function markRehearsed(root, m = 'M0') {
+  const s = state(root)
+  s.gates.rehearsed = { ...s.gates.rehearsed, [m]: { pass: 1, total: 1, failed: [], at: '2026-11-26T00:00:00.000Z' } }
+  writeFileSync(path.join(root, '.rail/state.json'), JSON.stringify(s))
+}
+
 export function runHook(script, input, env = {}) {
   const clean = { ...process.env }
   delete clean.RAIL_ALLOW_TEST_EDIT
@@ -55,6 +62,13 @@ export function git(cwd, ...args) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' })
   if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`)
   return r.stdout
+}
+
+// 레일 저장소: git 저장소이고 .rail/config.json 이 있다(훅은 이것이 없으면 아무것도 하지 않는다).
+export function railRepo(root = tmp(), config = '{}') {
+  git(root, 'init', '-q')
+  if (!existsSync(path.join(root, '.rail/config.json'))) put(root, '.rail/config.json', config)
+  return root
 }
 
 export function makeRepo() {

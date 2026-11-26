@@ -1,7 +1,6 @@
 ---
 name: rail
 description: 프로젝트를 레일(기획서→착수 전 결정과 시험→마일스톤→장면 확인)로 진행한다. 사용자가 "/rail", "다음 뭐 해", "어디까지 했지"라고 하거나 새 세션에서 작업을 이어 갈 때 쓴다.
-argument-hint: "[change|bug 내용]"
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *)
 ---
 # rail — 진입점
@@ -15,7 +14,7 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *)
 ## 입력: $ARGUMENTS
 
 ## 매번 하는 일
-1. `$ARGUMENTS` 가 `change` 나 `bug` 로 시작하면 `request <change|bug> "<나머지 글>"` 을 부르고 출력을 그대로 전한 뒤 끝낸다. 코드나 계획은 바꾸지 않는다.
+1. 주인이 기능을 바꾸자고 하면 기획서를 고치고 살아 있는 세 줄의 계획 변경에 적는다. 이상하다고 하면 고침 step 을 만든다.
 2. 위 상태의 `next` 를 그대로 한다. 낡아 보이면 `status --json` 을 다시 부른다. 적힌 명령, 파일 꼴, 질문 문구를 바꾸지 않는다.
 3. 그 일에 판단이 필요하면 상태의 `skill` 이 가리키는 스킬을 읽는다(rail-plan · rail-milestone · rail-check).
 4. 명령이 막히면 출력의 "빠진 것"과 "돌아갈 단계"를 사람에게 쉬운 말로 전하고 그것부터 채운다. 건너뛰지 않는다.

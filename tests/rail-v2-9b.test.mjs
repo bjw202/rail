@@ -1,4 +1,4 @@
-// 레일 2.9판 덜어내기 둘째(M12 뒤): 관문은 순서만 본다. 지운 내용 검사가 다시 생기지 않는지, 남긴 검사가 그대로인지 본다.
+// 관문은 순서와 마일스톤 시작 때의 착수 전 항목만 본다. 지운 내용 검사가 다시 생기지 않는지, 남긴 검사가 그대로인지 본다.
 // 규칙: 저장소의 .rail/config.json 값을 단언하지 않는다. 설정은 모두 임시 저장소에 만든다.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
@@ -26,8 +26,8 @@ function root(st = {}, rows = null) {
 }
 const MS = { stage: 'milestone', milestone: 'M0' }
 
-describe('단계 관문은 순서만 본다', () => {
-  test('기획서 형식, 승인 날짜, 착수 전 결정, 다음 마일스톤 표를 보지 않고, 건너뛰기만 막는다', () => {
+describe('단계 관문은 순서와 착수 전 항목만 본다', () => {
+  test('기획서 형식, 승인 날짜, 다음 마일스톤 표를 보지 않고, 건너뛰기와 풀리지 않은 착수 전 항목만 막는다', () => {
     const r = root()
     blocked(run(r, ['advance', 'milestone', '--milestone', 'M0']), /"plan" 단계라 "milestone" 로 갈 수 없습니다/)
     blocked(run(r, ['advance', 'decide', '--milestone', 'M0']), /docs\/PLAN\.md\(기획서\)가 없어 다음 마일스톤을 알 수 없습니다/)
@@ -38,11 +38,13 @@ describe('단계 관문은 순서만 본다', () => {
     assert.equal(state(r).gates.sheet_approved, null, '승인 줄이 없으면 승인 날짜도 없다')
     put(r, 'docs/plan/M1.md', `${HEAD}| M1-1 | 기능 | 가 | src/a.mjs | 없음 | 보인다 | |\n`)
     blocked(run(r, ['advance', 'milestone', '--milestone', 'M1']), /지금 시작 전 마일스톤은 M0 입니다/)
+    blocked(run(r, ['advance', 'milestone']), /착수 전 D-01 가 풀리지 않았습니다 \("결정: 미정" 입니다/)
+    put(r, 'docs/PLAN.md', planDoc(undefined, { 'D-01': '결정: AI가 고름(위임) (A)' }, false).replace('## 첫날 실패 장면\n- 빈 폴더를 열면 아무것도 안 보인다\n', ''))
     ok(run(r, ['advance', 'milestone']))
     assert.equal(state(r).stage, 'milestone')
     ok(run(r, ['advance', 'check']))
     const ev = events(r).filter((e) => ['gate_passed', 'gate_blocked'].includes(e.event)).map((e) => `${e.event}:${e.target}`)
-    assert.deepEqual(ev.filter((x) => x.startsWith('gate_blocked')).length, 5, '막힘도 그대로 기록한다')
+    assert.deepEqual(ev.filter((x) => x.startsWith('gate_blocked')).length, 6, '막힘도 그대로 기록한다')
   })
 
   test('남은 마일스톤이 없으면 decide 로 가지 않는다', () => {

@@ -1,7 +1,7 @@
 // 밤샘 자율(2.9판): 미리 승인한 뒤 마일스톤의 기능 목록(plan approve)과 사람 장면 판정 대기 목록.
 import { autonomyOn } from './config.mjs'
 import { fail, now, out } from './core.mjs'
-import { decisionStatus, nextOpenMilestone, readSheet } from './docs.mjs'
+import { nextOpenMilestone, openRisks, readSheet } from './docs.mjs'
 import { planProblems, readPlan } from './plan.mjs'
 import { staleList, staleText } from './stale.mjs'
 import { appendLog, loadState, saveState } from './state.mjs'
@@ -44,7 +44,7 @@ export function cmdPlan({ pos, flags }) {
     if (!m) return [`${id}: 지금 마일스톤 뒤의 안 닫힌 마일스톤 ${MAX_AHEAD}개(${can.map((x) => x.id).join(', ') || '없음'}) 안에 없습니다`]
     const plan = readPlan(id)
     if (!plan?.rows.length) return [`${id}: docs/plan/${id}.md 에 기능 줄이 없습니다`]
-    return [...planProblems(plan, st), ...m.risks.map((r) => decisionStatus(r, rm)).filter((d) => !d.ok).map((d) => `${id}: 착수 전 ${d.id} 가 풀리지 않았습니다 (${d.why})`)]
+    return [...planProblems(plan, st), ...openRisks(id, rm).map((d) => `${id}: 착수 전 ${d.id} 가 풀리지 않았습니다 (${d.why})`)]
   })
   if (problems.length) fail(`[미리 승인] 남길 수 없습니다:\n${problems.map((p) => `  - ${p}`).join('\n')}`)
   st.gates.plan_approved = { ...(st.gates.plan_approved ?? {}), ...Object.fromEntries(ids.map((id) => [id, { at: now(), said }])) }

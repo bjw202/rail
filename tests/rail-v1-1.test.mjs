@@ -1,10 +1,10 @@
-// 레일 1.1판 시험: step 상태 칸을 코드가 채우기, 표 검사, 커밋 정책, 커밋 전 시험 잠금, 시험 먼저 step 뒤 예정된 실패.
+// step 상태 칸을 코드가 채우기, 표 검사, 커밋 정책, 커밋 전 시험 잠금, 시험 먼저 step 뒤 예정된 실패.
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
-import { denied, events, git, planDoc, put, rail, runHook, state, tmp } from './helpers.mjs'
+import { denied, events, git, markRehearsed, planDoc, put, rail, runHook, state, tmp } from './helpers.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const today = () => {
@@ -22,6 +22,7 @@ function railRoot({ rows = ROWS, st = MILESTONE, withGit = false } = {}) {
   const root = tmp('rail11-')
   put(root, '.rail/state.json', JSON.stringify(st))
   put(root, 'docs/plan/M0.md', plan(...rows))
+  put(root, '.rail/config.json', '{}')
   if (withGit) {
     git(root, 'init', '-q')
     git(root, 'config', 'user.email', 'rail@example.com')
@@ -91,6 +92,7 @@ describe('step 상태 칸을 코드가 채운다', () => {
     rail(root, 'step-start', 'M0-1')
     rail(root, 'step-done', 'M0-1', '--note', '됨')
     assert.equal(rail(root, 'advance', 'check').code, 0)
+    markRehearsed(root)
     rail(root, 'scene', 'M0', '--result', 'pass', '--note', '봤다')
     assert.equal(rail(root, 'advance', 'close').code, 0)
     const rm = readFileSync(path.join(root, 'docs/PLAN.md'), 'utf8')

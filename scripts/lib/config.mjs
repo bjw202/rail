@@ -16,9 +16,9 @@ export const commitPolicy = () => {
   return POLICIES.commit.values.includes(v) ? v : POLICIES.commit.default
 }
 export const isolation = () => (loadConfig().isolation === 'worktree' ? 'worktree' : 'shared')
-// 자율 모드(2.2판). 커밋 정책처럼 사람만 바꾼다(policy set autonomy on|off). 기본 off.
+// 자율 모드. 커밋 정책처럼 사람만 바꾼다(policy set autonomy on|off). 기본 off.
 // 예산 규칙 셋은 저마다 켜고 끈다: 마지막 진척 뒤 지출, 지난 마일스톤 비용 중간값의 몇 배, 하루 상한.
-// 비용은 costCommand 가 잰다(표준 입력으로 구간을 받고 금액을 낸다). 무엇으로 잴지는 프로젝트마다 달라 .rail/config.json 에 둔다. 비면 비용을 읽지 못한 것으로 본다.
+// 비용은 costCommand 가 잰다(표준 입력으로 구간을 받고 금액을 낸다). 무엇으로 잴지는 프로젝트마다 달라 .rail/config.json 에 둔다. 비면 예산 규칙을 쓰지 않는다.
 export const AUTONOMY_DEFAULT = {
   mode: 'off',
   maxSameFailure: 3,
@@ -52,18 +52,13 @@ export function autonomy() {
 }
 // 커밋 정책이 auto-local 이 아니면 켜져 있어도 쓰지 않는다(자율인데 커밋마다 물으면 멈춘다).
 export const autonomyOn = () => autonomy().mode === 'on' && commitPolicy() === 'auto-local'
-// ---------- 2.0판 설정 ----------
-// 판 번호가 2 이상이면 2.0판 관문(리허설 기록)을 쓴다. 닫힌 마일스톤에는 소급하지 않는다.
-export const isV2 = () => Number.parseFloat(loadConfig().railVersion) >= 2
-// 2.3판부터 켜는 것(닫힘 알림의 새 줄, rail_size 기록, 크기 경고). 예전 판 저장소는 예전 그대로다.
-export const atLeast = (v) => Number.parseFloat(loadConfig().railVersion) >= v
 // 바깥 정답 검증기: [{ name, command, why }]. 종료 코드 0 통과, SKIP_CODE 건너뜀(실제 기록 없음 등), 그 밖은 실패.
 export const SKIP_CODE = 3
 export const verifiers = () => {
   const v = loadConfig().verify
   return Array.isArray(v) ? v.filter((x) => x && typeof x.name === 'string' && typeof x.command === 'string' && x.command.trim()) : []
 }
-// 레일 판 번호의 원본은 config 의 railVersion 하나다. 없으면 null.
+// 레일 판 번호(status 머리에 보이는 이름표, 동작은 바꾸지 않는다). 없으면 null.
 export const railVersion = () => {
   const v = loadConfig().railVersion
   return (typeof v === 'string' || typeof v === 'number') && String(v).trim() ? String(v).trim() : null
