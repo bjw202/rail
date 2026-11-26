@@ -4,8 +4,9 @@ import { lastLines } from './core.mjs'
 
 export function orca(args, timeout = 90_000) {
   const bin = process.env.ORCA_CLI_COMMAND || 'orca'
+  const o = { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 }
   // .mjs 가짜 orca 는 node 로 부른다(Windows 는 #! 줄을 읽지 않는다).
-  const r = /\.m?js$/.test(bin) ? spawnSync(process.execPath, [bin, ...args], { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 }) : spawnSync(bin, args, { encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 })
+  const r = /\.m?js$/.test(bin) ? spawnSync(process.execPath, [bin, ...args], o) : WIN && !/\.(exe|com)$/i.test(bin) ? viaCmd(bin, args, o) : spawnSync(bin, args, o)
   let json = null
   try {
     json = JSON.parse(r.stdout)
@@ -13,6 +14,19 @@ export function orca(args, timeout = 90_000) {
   const ok = r.status === 0 && !r.error && json?.ok !== false
   const why = r.error?.message ?? (json?.error ? (typeof json.error === 'string' ? json.error : json.error.message ?? JSON.stringify(json.error)) : null) ?? (lastLines(r.stderr || r.stdout, 3).join(' / ') || `종료 코드 ${r.status}`)
   return { ok, json, text: `${r.stdout ?? ''}\n${r.stderr ?? ''}`, error: ok ? null : why }
+}
+
+// Windows 의 Orca 명령은 배치 파일(orca.cmd)이라 셸 없이는 부를 수 없다. cmd 를 거치되 인자는 cmd 가 다시 읽지 못하게 막고
+// (cross-spawn 과 같은 방식: 배치 파일이 %* 로 한 번 더 읽으므로 두 번 막는다), cmd 가 자르는 줄바꿈 든 --body 는 표준 입력(--body-file -)으로 보낸다.
+const WIN = process.platform === 'win32'
+const META = /([()\][%!^"`<>&|;, *?])/g
+function viaCmd(bin, args, o) {
+  const i = args.indexOf('--body')
+  const input = i >= 0 && /[\r\n]/.test(args[i + 1]) ? args[i + 1] : undefined
+  if (input !== undefined) args = [...args.slice(0, i), '--body-file', '-', ...args.slice(i + 2)]
+  const arg = (a) => `"${String(a).replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`.replace(META, '^^^$1')
+  const line = [bin.replace(META, '^$1'), ...args.map(arg)].join(' ')
+  return spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${line}"`], { ...o, input, windowsVerbatimArguments: true })
 }
 
 export const SETTLED = new Set(['succeeded', 'failed', 'cancelled', 'canceled', 'released', 'abandoned', 'stopped', 'settled'])

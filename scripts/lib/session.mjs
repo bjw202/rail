@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import tty from 'node:tty'
 import { F } from './core.mjs'
 import { loadState, lock, saveState, unlock } from './state.mjs'
 import { openWorkers } from './workers.mjs'
@@ -9,14 +10,28 @@ import { openWorkers } from './workers.mjs'
 // ---------- 압축 이어받기 ----------
 // 훅 입력(표준 입력의 JSON).
 // 터미널이나 /dev/null(문자 장치)이면 읽지 않는다. 훅은 파이프로 JSON 을 주고 닫는다.
+// Windows 는 파이프를 FIFO 로 알려 주지 않으므로 터미널만 거르고, 파이프 끝의 EOF 오류는 끝으로 본다.
 export function hookInput() {
   try {
-    const fd = fs.fstatSync(0)
-    if (!fd.isFIFO() && !fd.isFile() && !fd.isSocket()) return {}
-    const v = JSON.parse(fs.readFileSync(0, 'utf8') || '{}')
+    const fd = process.platform === 'win32' ? null : fs.fstatSync(0)
+    if (fd ? !fd.isFIFO() && !fd.isFile() && !fd.isSocket() : tty.isatty(0)) return {}
+    const v = JSON.parse(readStdin() || '{}')
     return v && typeof v === 'object' ? v : {}
   } catch {
     return {}
+  }
+}
+function readStdin() {
+  const [parts, buf] = [[], Buffer.alloc(1 << 16)]
+  for (let n; (n = readChunk(buf)); ) parts.push(Buffer.from(buf.subarray(0, n)))
+  return Buffer.concat(parts).toString('utf8')
+}
+function readChunk(buf) {
+  try {
+    return fs.readSync(0, buf)
+  } catch (e) {
+    if (e.code === 'EOF') return 0
+    throw e
   }
 }
 // 리더 세션 번호를 상태의 leader_session 에 적는다(세션 시작·마무리 때). 열린 작업자의 창에서 온 세션과,

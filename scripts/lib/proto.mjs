@@ -12,6 +12,8 @@ import { findIn, openWorkers } from './workers.mjs'
 // 화면·배치·속도처럼 봐야 아는 결정은 카드에 "시제품: 예", "## 변주"(2~3개), "## 스크린샷"(찍을 화면)을 둔다.
 // 변주마다 새 작업 공간에 작업자를 띄워 버릴 시제품을 실제 데이터로 만들고, 기록이 다 모이면 카드에 표와 비교 페이지를 붙여 한 번 묻는다.
 export const PROTO_DIR = path.join(ROOT, '.rail/proto')
+// 절대 경로: /… 또는 Windows 의 C:\… · \\서버\….
+const ABS = /^(\/|[A-Za-z]:[\\/]|\\\\)/
 export const relRoot = (f) => path.relative(ROOT, f).split(path.sep).join('/')
 export const pairs = (lines) =>
   items(lines).flatMap((l) => {
@@ -118,7 +120,7 @@ export function protoStart(id, flags) {
       out(`[시제품 실패] ${step}: 작업자를 띄우지 못했습니다 (${ws.error ?? 'dispatchId 가 없습니다'}).`)
       continue
     }
-    let worktree = findIn(ws.json, 'worktreePath', /^\//) ?? findIn(ws.json, 'path', /^\//)
+    let worktree = findIn(ws.json, 'worktreePath', ABS) ?? findIn(ws.json, 'path', ABS)
     let branch = shortBranch(findIn(ws.json, 'branch', /\S/))
     // 응답에 경로나 브랜치가 없으면 Orca 의 작업 공간 목록에서 이름으로 찾는다(정리에 쓴다). 그래도 없으면 null.
     if (!worktree || !branch) {
@@ -285,7 +287,7 @@ export function protoWorktree(name) {
   const list = r.json?.result?.worktrees ?? r.json?.worktrees ?? []
   if (!r.ok || !Array.isArray(list)) return null
   const hit = list.find((w) => w && (w.displayName === name || path.basename(String(w.path ?? '')) === name || shortBranch(w.branch)?.split('/').pop() === name))
-  return hit ? { path: typeof hit.path === 'string' && hit.path.startsWith('/') ? hit.path : null, branch: shortBranch(hit.branch) } : null
+  return hit ? { path: typeof hit.path === 'string' && ABS.test(hit.path) ? hit.path : null, branch: shortBranch(hit.branch) } : null
 }
 // 기록에도 Orca 목록에도 브랜치가 없을 때: 로컬 브랜치 가운데 이름이 같거나 "/<이름>" 으로 끝나는 것.
 export function protoLocalBranch(name) {

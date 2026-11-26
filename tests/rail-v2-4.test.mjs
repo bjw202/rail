@@ -56,7 +56,7 @@ appendFileSync(${JSON.stringify(dir)} + '/calls.jsonl', JSON.stringify(args) + '
 const opt = (k) => args[args.indexOf(k) + 1]
 const say = (o) => process.stdout.write(JSON.stringify(o))
 const [a, b] = args
-if (a === 'orchestration' && b === 'worker-start') say({ ok: true, result: { dispatchId: 'ctx_' + opt('--name'), worktree: { path: ${JSON.stringify(path.join(root, 'wt'))} + '/' + opt('--name'), branch: 'user/' + opt('--name') } } })
+if (a === 'orchestration' && b === 'worker-start') say({ ok: true, result: { dispatchId: 'ctx_' + opt('--name'), worktree: { path: ${JSON.stringify(path.join(root, 'wt') + path.sep)} + opt('--name'), branch: 'user/' + opt('--name') } } })
 else if (a === 'orchestration' && b === 'worker-show') say({ ok: true, result: { state: 'succeeded', stage: 'settled' } })
 else if (a === 'orchestration' && b === 'worker-read') say({ ok: true, result: { report: '시제품 끝' } })
 else if (a === 'orchestration' && ['worker-release', 'worker-stop'].includes(b)) say({ ok: true, result: {} })

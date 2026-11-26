@@ -6,8 +6,8 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { fileURLToPath } from 'node:url'
-import { DECIDED_PLAN, RAIL, events, git, put, runHook, state, tmp } from './helpers.mjs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { DECIDED_PLAN, RAIL, WIN, events, git, put, runHook, state, tmp } from './helpers.mjs'
 
 // rail.mjs 를 임시 저장소 기준으로 부른다. 바깥 세션의 Orca·상태줄 환경은 지운다(진짜 알림이 나가거나 진짜 캐시를 읽지 않게).
 function run(root, args, { env = {}, input = '' } = {}) {
@@ -186,6 +186,24 @@ describe('닫힘 알림 (2.3판)', () => {
     const body = sentBody(root).split('\n')
     assert.match(body[0], /CW 모름 · 압축 0번$/)
     assert.equal(body.length, 2)
+  })
+})
+
+// Windows 의 Orca 명령은 배치 파일(orca.cmd)이다. 레일은 cmd 를 거쳐 부르므로, 특수 글자가 든 인자가 그대로 닿는지 본다.
+describe('Windows 의 orca.cmd 부르기', () => {
+  test('배치 파일 orca 에 특수 글자 인자를 그대로 넘기고, 줄바꿈 든 --body 는 표준 입력(--body-file -)으로 보낸다', { skip: !WIN && 'Windows 에서만' }, () => {
+    const root = tmp('rail23w-')
+    const got = path.join(root, 'got.json')
+    put(root, 'fake dir/orca.mjs', `import { writeFileSync } from 'node:fs'\nconst a = process.argv.slice(2)\nlet stdin = null\nif (a.includes('--body-file')) { stdin = ''; for await (const c of process.stdin) stdin += c }\nwriteFileSync(${JSON.stringify(got)}, JSON.stringify({ a, stdin }))\nprocess.stdout.write('{"ok":true}')\n`)
+    put(root, 'fake dir/orca.cmd', `@echo off\r\nsetlocal\r\nset "NODE=${process.execPath}"\r\n"%NODE%" "%~dp0orca.mjs" %*\r\n`)
+    const args = ['orchestration', 'send', 'a&b|c<d>', 'say "hi" (x)', '100% %PATH% !x!', '^caret;comma,', 'C:\\back\\slash\\', '한글 · 닫힘', '', '--body', '첫 줄\n둘째 줄 "따옴표" & 끝']
+    const lib = pathToFileURL(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts/lib/orca.mjs')).href
+    const code = `import { orca } from ${JSON.stringify(lib)}\nprocess.stdout.write(JSON.stringify(orca(${JSON.stringify(args)})))`
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', code], { encoding: 'utf8', env: { ...process.env, RAIL_ROOT: root, ORCA_CLI_COMMAND: path.join(root, 'fake dir', 'orca.cmd') } })
+    assert.equal(JSON.parse(r.stdout).ok, true, r.stderr + r.stdout)
+    const g = JSON.parse(readFileSync(got, 'utf8'))
+    assert.deepEqual(g.a, [...args.slice(0, -2), '--body-file', '-'])
+    assert.equal(g.stdin, args.at(-1))
   })
 })
 

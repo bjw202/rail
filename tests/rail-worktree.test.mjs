@@ -29,6 +29,7 @@ function repo({ isolation = 'worktree', rows = [ROW('M0-1')] } = {}) {
   git(root, 'init', '-q', '-b', 'main')
   git(root, 'config', 'user.email', 'wt@example.com')
   git(root, 'config', 'user.name', 'wt')
+  git(root, 'config', 'core.autocrlf', 'false') // Windows 의 git 은 꺼낼 때 줄 끝을 CRLF 로 바꾼다. 시험은 바이트를 그대로 비교한다.
   git(root, 'add', '-A')
   git(root, 'commit', '-qm', 'init')
   const fake = path.join(base, 'fake-orca.mjs')
