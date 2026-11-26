@@ -1,0 +1,5 @@
+.orchestration/
+.rail/.lock
+.rail/state.json.*.tmp
+# 시제품 결과(지시서, 스크린샷, 비교 페이지)는 git 에 넣지 않는다. 공통 틀 .rail/proto/template.md 만 넣는다.
+.rail/proto/*/

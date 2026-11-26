@@ -1,0 +1,8 @@
+{
+  "name": "rail-example-tiny",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

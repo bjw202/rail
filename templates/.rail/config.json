@@ -1,0 +1,16 @@
+{
+  "railVersion": "2.9",
+  "checkCommand": "node --test",
+  "commitPolicy": "ask",
+  "appStart": "",
+  "verify": [],
+  "codexRoles": ["final-review"],
+  "autonomy": {
+    "mode": "off",
+    "budget": {
+      "costCommand": ""
+    }
+  },
+  "insurance": ["guard-tests", "stop-check", "gate:close"],
+  "disabled": []
+}
