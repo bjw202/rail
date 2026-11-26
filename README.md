@@ -77,37 +77,53 @@ AI 코딩 작업을 **기획 → 마일스톤 → 확인**의 순서로 끌고 �
 
 ## 5. 설치
 
-레일은 레포(제품 저장소)마다 설치합니다. 레일 원본을 한 번 받아 두고, 제품 레포마다 설치 명령을 돌립니다.
+레일은 레포(제품 저장소)마다 설치합니다. 컴퓨터마다 한 번 원본을 받아 `rail-install` 명령을 만들어 두고, 제품 레포마다 그 폴더에서 `rail-install` 을 칩니다.
 
-### 원본 받기 (한 번만)
+### 한 번만: 원본 받기와 `rail-install` 만들기
 
 맥(터미널):
 
 ```sh
 git clone https://github.com/bjw202/rail ~/tools/rail
+cd ~/tools/rail && npm link
 ```
 
 Windows(PowerShell):
 
 ```powershell
 git clone https://github.com/bjw202/rail C:\tools\rail
+cd C:\tools\rail; npm link
 ```
 
-### 제품 레포에 깔기
+`npm link` 는 어느 폴더에서나 `rail-install` 을 칠 수 있게 해 줍니다(원본 폴더를 가리키는 연결만 만들고, 파일을 복사하지 않습니다). nvm 같은 도구로 Node 판을 바꾸면 그 판에는 연결이 없으므로 원본 폴더에서 `npm link` 를 다시 합니다.
+
+### 레포마다: 그 폴더에서 `rail-install`
 
 맥:
 
 ```sh
-node ~/tools/rail/scripts/install.mjs ~/projects/my-app
+cd ~/projects/my-app
+rail-install
 ```
 
 Windows(PowerShell):
 
 ```powershell
-node C:\tools\rail\scripts\install.mjs C:\projects\my-app
+cd C:\projects\my-app
+rail-install
 ```
 
-설치는 Node 만으로 돌고 셸 명령을 쓰지 않으므로 맥과 Windows 에서 같은 명령입니다. 출력에 새로 만들거나 바꾼 파일이 한 줄씩 나옵니다.
+대상은 git 레포의 맨 위 폴더여야 합니다. git 레포가 아닌 폴더, 레포의 하위 폴더, 레일 원본 폴더에서 치면 아무것도 깔지 않고 이유를 알려 줍니다. 설치는 Node 만으로 돌고 셸 명령을 쓰지 않으므로 맥과 Windows 에서 같은 명령입니다. 출력에 새로 만들거나 바꾼 파일이 한 줄씩 나옵니다.
+
+`npm link` 없이 긴 명령으로도 됩니다. 원본의 설치 도구에 레포 경로를 줍니다.
+
+```sh
+node ~/tools/rail/scripts/install.mjs ~/projects/my-app
+```
+
+```powershell
+node C:\tools\rail\scripts\install.mjs C:\projects\my-app
+```
 
 ### 설치 뒤 생기는 파일
 
@@ -137,21 +153,23 @@ node C:\tools\rail\scripts\install.mjs C:\projects\my-app
 
 ## 6. 업데이트
 
-레일 원본을 새로 받고 설치를 다시 돌립니다.
+레일 원본을 새로 받고, 레포마다 그 폴더에서 `rail-install` 을 다시 칩니다. `npm link` 는 다시 하지 않아도 됩니다(연결이 원본 폴더를 가리키므로 `git pull` 한 새 판이 그대로 쓰입니다).
 
 맥:
 
 ```sh
 cd ~/tools/rail && git pull
-node ~/tools/rail/scripts/install.mjs ~/projects/my-app
+cd ~/projects/my-app && rail-install
 ```
 
 Windows(PowerShell):
 
 ```powershell
 cd C:\tools\rail; git pull
-node C:\tools\rail\scripts\install.mjs C:\projects\my-app
+cd C:\projects\my-app; rail-install
 ```
+
+긴 명령(`node ~/tools/rail/scripts/install.mjs ~/projects/my-app`)도 그대로 됩니다.
 
 - **바뀌는 것:** `.rail/bin/`, `.rail/hooks/`, `.claude/skills/rail*/` 의 레일 파일, `.claude/settings.json` 의 레일 훅 줄, `.rail/installed.json`. 지난 판에만 있던 레일 파일은 지웁니다(설치 목록에 있던 것만 지우므로 `.rail/bin/` 에 직접 둔 비용 명령 같은 파일은 남습니다).
 - **안 바뀌는 것:** `.rail/config.json`, 시작 틀, `docs/RAIL.md`, 상태와 기록, 기획서와 step 표.
@@ -167,7 +185,7 @@ node C:\tools\rail\scripts\install.mjs C:\projects\my-app
 | `/rail` | 거의 모든 순간. "다음 뭐 해?", "어디까지 했지?"도 됩니다 |
 | `node .rail/bin/rail.mjs status` | 터미널에서 위치 세 줄만 보고 싶을 때 |
 | `node .rail/bin/rail.mjs usage` | 부품마다 마일스톤별로 몇 번 일하고 막았는지 볼 때 |
-| `node scripts/install.mjs <레포>` (원본 폴더에서) | 설치와 업데이트 |
+| `rail-install` (제품 레포 폴더에서), 또는 `node <원본>/scripts/install.mjs <레포>` | 설치와 업데이트 |
 
 정책 바꾸기(`policy set …`, `plan approve …`)는 사람이 리더 세션에 말하면 리더가 사람 말을 `--said` 에 그대로 넣어 부릅니다. 사람이 직접 칠 일은 거의 없습니다.
 
@@ -312,7 +330,7 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
 |---|---|
 | `scripts/rail.mjs` | 명령을 받아 넘기는 입구 |
 | `scripts/lib/*.mjs` | 하는 일 하나씩: 상태·잠금·기록(`state.mjs`), 관문(`gates.mjs`), 위치와 다음 할 일 문구(`status.mjs`), 기획서 읽기와 착수 전 판정(`docs.mjs`), 작업자(`workers.mjs`), 자율 모드(`autonomy.mjs`, `budget.mjs`), 미리 승인과 판정 대기(`queue.mjs`), 기능 확인(`check.mjs`), 장면·리허설(`scene.mjs`), 부품 쓰임(`usage.mjs`, `parts.mjs`), 시제품(`proto.mjs`), 낡은 시험 판정(`stale.mjs`), worktree(`worktree.mjs`), Orca 부르기(`orca.mjs`). 파일마다 맨 위 한 줄이 그 일입니다 |
-| `scripts/install.mjs` | 설치·업데이트 도구(제품 레포에는 깔리지 않음) |
+| `scripts/install.mjs` | 설치·업데이트 도구. `npm link` 하면 `rail-install` 명령이 됨(제품 레포에는 깔리지 않음) |
 | `hooks/*.mjs` | 훅. 설치하면 `.rail/hooks/` 로 갑니다 |
 | `skills/rail*/` | 스킬. 설치하면 `.claude/skills/` 로 갑니다 |
 | `templates/` | 시작 틀. 설치할 때 없는 것만 만듭니다 |

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 레일을 레포 하나에 설치·업데이트한다: node scripts/install.mjs <대상 레포>. Node 내장 모듈만 쓰고 셸 명령을 부르지 않는다(macOS·Windows 같은 명령).
+// 레일을 레포 하나에 설치·업데이트한다: node scripts/install.mjs [대상 레포], 또는 npm link 뒤 그 레포 폴더에서 rail-install. 대상을 안 주면 지금 폴더. Node 내장 모듈만 쓰고 셸 명령을 부르지 않는다(macOS·Windows 같은 명령).
 // 레일 파일(.rail/bin, .rail/hooks, .claude/skills/rail*)은 늘 새로 쓰고, 시작 틀은 없을 때만 만든다. 상태·기록·기획서는 건드리지 않는다.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -27,6 +27,14 @@ export function hasGitBash(env = process.env) {
   return at.some((f) => f && fs.existsSync(f))
 }
 export const GIT_BASH_WARNING = `\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n[레일 설치 경고] Git Bash 를 찾지 못했습니다. Git for Windows 를 깔기를 권합니다: 없으면 Claude Code 가 Bash 도구 대신 PowerShell 을 씁니다.\n레일은 그대로 설치했고 시험 잠금은 PowerShell 명령도 보지만, 그 판정은 Bash 쪽보다 거칩니다. 이미 깔았다면 settings.json 의 env 에 CLAUDE_CODE_GIT_BASH_PATH(bash.exe 경로)를 적으세요.\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n`
+// 실제 경로(심볼릭 링크·Windows junction 을 풀고 대소문자도 맞춘 것). 없는 경로는 그대로.
+const real = (f) => {
+  try {
+    return fs.realpathSync.native(f)
+  } catch {
+    return path.resolve(f)
+  }
+}
 const list = (dir, rel = '') => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? list(path.join(dir, e.name), `${rel}${e.name}/`) : [`${rel}${e.name}`])) : [])
 
 // 설치할 파일: [원본 절대 경로, 대상 상대 경로]. 레일 파일과 없을 때만 만드는 시작 틀로 나눈다.
@@ -57,6 +65,12 @@ export function mergeSettings(s) {
 export function install(target) {
   const T = path.resolve(target)
   if (!fs.existsSync(T) || !fs.statSync(T).isDirectory()) throw new Error(`대상 폴더가 없습니다: ${T}`)
+  if (real(T) === real(SRC)) throw new Error(`여기는 레일 원본 폴더입니다(${T}). 레일을 깔 제품 레포 폴더로 가서 다시 치세요.`)
+  if (!fs.existsSync(path.join(T, '.git'))) {
+    let top = path.dirname(T)
+    while (!fs.existsSync(path.join(top, '.git')) && path.dirname(top) !== top) top = path.dirname(top)
+    throw new Error(fs.existsSync(path.join(top, '.git')) ? `${T} 는 git 레포의 하위 폴더입니다. 레포 맨 위 폴더(${top})에서 다시 치세요.` : `${T} 는 git 레포가 아닙니다. 제품 레포 폴더에서 치거나, 먼저 git init 하세요.`)
+  }
   const changed = []
   const write = (rel, body) => {
     const f = path.join(T, rel)
@@ -89,14 +103,10 @@ export function install(target) {
   return { target: T, changed, commit, dirty }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const target = process.argv[2]
-  if (!target) {
-    process.stderr.write('사용법: node scripts/install.mjs <대상 레포 경로>\n')
-    process.exit(2)
-  }
+// 직접 실행됐나: npm link 의 심볼릭 링크나 Windows .cmd 껍데기로 부르면 argv[1] 이 링크 경로라, 양쪽을 실제 경로로 풀어(real) 비교한다.
+if (process.argv[1] && real(process.argv[1]) === real(fileURLToPath(import.meta.url))) {
   try {
-    const r = install(target)
+    const r = install(process.argv[2] ?? process.cwd())
     process.stdout.write(`[레일 설치] ${r.target} — 레일 ${r.commit ?? '(커밋 모름)'}${r.dirty ? ' (커밋 안 된 변경 있음)' : ''}\n${r.changed.length ? r.changed.map((c) => `  ${c}`).join('\n') : '  바뀐 파일 없음'}\n`)
     if (process.platform === 'win32' && !hasGitBash()) process.stdout.write(GIT_BASH_WARNING)
   } catch (e) {

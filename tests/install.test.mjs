@@ -1,16 +1,18 @@
 // 레포마다 설치: node scripts/install.mjs <대상>. 다시 돌리면 업데이트이고, 레일 훅은 한 번만 들어가며, 상태·기획서와 다른 설정은 그대로다.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
 import { GIT_BASH_WARNING, hasGitBash } from '../scripts/install.mjs'
 import { denied, git, put, tmp } from './helpers.mjs'
 
-const INSTALL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts/install.mjs')
-const install = (target) => {
-  const r = spawnSync(process.execPath, [INSTALL, target], { encoding: 'utf8' })
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const INSTALL = path.join(ROOT, 'scripts/install.mjs')
+// 대상을 주면 인자로, 안 주면(undefined) cwd 에서 인자 없이 부른다. file 로 다른 경로(링크)의 install.mjs 를 부를 수 있다.
+const install = (target, { cwd, file = INSTALL } = {}) => {
+  const r = spawnSync(process.execPath, [file, ...(target === undefined ? [] : [target])], { cwd, encoding: 'utf8' })
   return { code: r.status, out: r.stdout, err: r.stderr }
 }
 const read = (root, rel) => readFileSync(path.join(root, rel), 'utf8')
@@ -138,8 +140,40 @@ describe('설치', () => {
     assert.match(read(root, '.rail/log.jsonl'), /"event":"hook_blocked"/)
   })
 
-  test('대상이 없으면 실패하고, 인자가 없으면 사용법을 알린다', () => {
+  test('대상이 없으면 실패하고, git 레포가 아니거나 레포의 하위 폴더거나 레일 원본 자신이면 깔지 않고 쉬운 말로 알린다', () => {
     assert.equal(install(path.join(tmp(), 'nope')).code, 1)
-    assert.equal(spawnSync(process.execPath, [INSTALL], { encoding: 'utf8' }).status, 2)
+    const plain = tmp('rail-plain-')
+    const r = install(undefined, { cwd: plain })
+    assert.equal(r.code, 1)
+    assert.match(r.err, /git 레포가 아닙니다\. 제품 레포 폴더에서 치거나, 먼저 git init 하세요/)
+    assert.ok(!existsSync(path.join(plain, '.rail')), '아무것도 깔지 않는다')
+    const root = repo()
+    const sub = install(undefined, { cwd: path.join(root, 'tests') })
+    assert.equal(sub.code, 1)
+    assert.ok(sub.err.includes(`레포 맨 위 폴더(${root})에서 다시 치세요`), sub.err)
+    const self = install(undefined, { cwd: ROOT })
+    assert.equal(self.code, 1)
+    assert.match(self.err, /레일 원본 폴더입니다/)
+  })
+
+  test('인자 없이 부르면 지금 폴더(cwd)의 레포에 깐다', () => {
+    const root = repo()
+    const r = install(undefined, { cwd: root })
+    assert.equal(r.code, 0, r.err)
+    assert.ok(r.out.startsWith(`[레일 설치] ${root} `), r.out)
+    assert.ok(existsSync(path.join(root, '.rail/bin/rail.mjs')))
+  })
+
+  test('npm link 처럼 심볼릭 링크(Windows 는 junction)를 거쳐 package.json 의 bin(rail-install)을 불러도 본문이 돌아 지금 폴더에 깐다', () => {
+    const { bin } = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
+    assert.equal(bin['rail-install'], 'scripts/install.mjs')
+    assert.match(readFileSync(path.join(ROOT, bin['rail-install']), 'utf8'), /^#!\/usr\/bin\/env node\n/, 'npm 이 껍데기를 만들 수 있게 첫 줄이 node shebang')
+    const link = path.join(tmp('rail-link-'), 'rail')
+    symlinkSync(ROOT, link, 'junction')
+    const root = repo()
+    const r = install(undefined, { cwd: root, file: path.join(link, bin['rail-install']) })
+    assert.equal(r.code, 0, r.err)
+    assert.match(r.out, /\[레일 설치\]/, '링크 경로로 불러도 "직접 실행" 으로 알아본다')
+    assert.ok(existsSync(path.join(root, '.rail/bin/rail.mjs')))
   })
 })

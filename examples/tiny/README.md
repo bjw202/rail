@@ -8,8 +8,9 @@
 
 ```sh
 cp -R examples/tiny ~/tmp/tiny
-node scripts/install.mjs ~/tmp/tiny
-cd ~/tmp/tiny && git init -q && git add -A && git commit -qm init
+cd ~/tmp/tiny && git init -q
+rail-install   # 또는 node <레일 원본>/scripts/install.mjs ~/tmp/tiny
+git add -A && git commit -qm init
 node .rail/bin/rail.mjs status   # 위치: 기획 · 기획서 (질문 0)
 ```
 
