@@ -12,10 +12,10 @@ export const gateEv = (e, ...targets) => (e.event === 'gate_passed' || e.event =
 // 지운 관문: 2.9판의 step-start 기다리는 step, 표 검사(validate), 시제품 질문 전 기록. M14 뒤의 파일 겹침 거절, 시제품 섞임 막기(부품 proto). 그 예전 사건은 기록에 남지만 세지 않는다.
 // TABLE_HOLD: 예전 표 검사가 붙잡은 줄을 마무리 검사의 막음으로 세지 않으려고 남긴다.
 export const TABLE_HOLD = /^계획 표 검사/
-export const ORDER_TARGETS = ['roadmap', 'decide', 'milestone', 'check', 'step-done']
+export const ORDER_TARGETS = ['decide', 'milestone', 'check', 'step-done']
 export const PARTS = [
   // 단계 순서 검사: 지금 단계에서 갈 수 있는 다음 단계만 허용한다. 내용 검사가 없어 꺼도 건너뛸 것이 없으므로 끄지 않는다(fixed).
-  { id: 'gate:order', fixed: true, name: '단계 순서 검사 (roadmap·decide·milestone·check·step-done)', ran: (e) => gateEv(e, ...ORDER_TARGETS), blocked: (e) => e.event === 'gate_blocked' && ORDER_TARGETS.includes(e.target) },
+  { id: 'gate:order', fixed: true, name: '단계 순서 검사 (decide·milestone·check·step-done)', ran: (e) => gateEv(e, ...ORDER_TARGETS), blocked: (e) => e.event === 'gate_blocked' && ORDER_TARGETS.includes(e.target) },
   { id: 'gate:close', name: '관문 close (장면 확인 관문)', ran: (e) => gateEv(e, 'close'), blocked: (e) => e.event === 'gate_blocked' && e.target === 'close' },
   { id: 'feature-check', name: '기능 확인 (확인 기록 없이 기능 step 을 끝내지 않음)', ran: (e) => gateEv(e, 'feature-check'), blocked: (e) => e.event === 'gate_blocked' && e.target === 'feature-check' },
   { id: 'guard-tests', name: '시험 잠금 훅', ran: null, blocked: (e) => e.event === 'hook_blocked' && e.hook !== 'proto-merge' },

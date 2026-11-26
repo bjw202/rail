@@ -7,7 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { DECIDED, GOOD_BRIEF, RAIL, events, git, put, runHook, state, tmp } from './helpers.mjs'
+import { DECIDED_PLAN, RAIL, events, git, put, runHook, state, tmp } from './helpers.mjs'
 
 // rail.mjs 를 임시 저장소 기준으로 부른다. 바깥 세션의 Orca·상태줄 환경은 지운다(진짜 알림이 나가거나 진짜 캐시를 읽지 않게).
 function run(root, args, { env = {}, input = '' } = {}) {
@@ -153,9 +153,7 @@ function closeRoot(cfg = {}) {
   put(root, 'fake-orca.mjs', `#!/usr/bin/env node\nimport { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(path.join(root, 'sent.json'))}, JSON.stringify(process.argv.slice(2)))\n`)
   spawnSync('chmod', ['+x', fake])
   put(root, '.rail/config.json', JSON.stringify({ railVersion: '2.3', notify: { bot: 'coach' }, ...cfg }))
-  put(root, 'docs/BRIEF.md', GOOD_BRIEF)
-  put(root, 'docs/ROADMAP.md', '# 로드맵\n승인: 2026-11-24\n## M0 뼈대\n- 끝나는 장면: 보인다\n- 위험 질문: D-01 방법\n- 예상 기간: 3일\n## 다시 잰 예상\n- M0 끝: 예상 3일 → 실제 1일\n')
-  put(root, 'docs/decisions/D-01.md', DECIDED)
+  put(root, 'docs/PLAN.md', DECIDED_PLAN)
   put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 완료 기준 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | 가 | src/a.mjs | 기준 | ✅ 끝(2026-11-24) 됨 |\n')
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: { M0: { result: 'pass', note: '봤다' } }, rehearsed: {} } }))
   return { root, env: { ORCA_CLI_COMMAND: fake } }

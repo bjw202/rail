@@ -1,6 +1,6 @@
 ---
 name: rail
-description: 프로젝트를 레일(브리프→로드맵→결정 카드→마일스톤→장면 확인)로 진행한다. 사용자가 "/rail", "다음 뭐 해", "어디까지 했지"라고 하거나 새 세션에서 작업을 이어 갈 때 쓴다.
+description: 프로젝트를 레일(기획서→착수 전 결정과 시험→마일스톤→장면 확인)로 진행한다. 사용자가 "/rail", "다음 뭐 해", "어디까지 했지"라고 하거나 새 세션에서 작업을 이어 갈 때 쓴다.
 argument-hint: "[change|bug 내용]"
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *)
 ---
@@ -17,7 +17,7 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *)
 ## 매번 하는 일
 1. `$ARGUMENTS` 가 `change` 나 `bug` 로 시작하면 `request <change|bug> "<나머지 글>"` 을 부르고 출력을 그대로 전한 뒤 끝낸다. 코드나 계획은 바꾸지 않는다.
 2. 위 상태의 `next` 를 그대로 한다. 낡아 보이면 `status --json` 을 다시 부른다. 적힌 명령, 파일 꼴, 질문 문구를 바꾸지 않는다.
-3. 그 일에 판단이 필요하면 상태의 `skill` 이 가리키는 스킬을 읽는다(rail-brief · rail-roadmap · rail-milestone · rail-check).
+3. 그 일에 판단이 필요하면 상태의 `skill` 이 가리키는 스킬을 읽는다(rail-plan · rail-milestone · rail-check).
 4. 명령이 막히면 출력의 "빠진 것"과 "돌아갈 단계"를 사람에게 쉬운 말로 전하고 그것부터 채운다. 건너뛰지 않는다.
 5. 자율 모드(`autonomy.effective`)면 턴을 끝내기 전에 `next` 를 부른다. "할 일:" 이면 이어서 하고, "멈춤(...)" 이면 까닭을 한 줄로 쓰고 끝낸다. 스스로 "이 정도면 됐다"고 멈추지 않는다.
 6. 사람에게 보이는 마지막 글은 `status` 의 세 줄(위치 / 기다리는 것 / 다음 할 일)로 시작하고, 그 아래에 사람이 할 일을 질문 하나로만 쓴다. 없으면 "사람이 할 일 없음".

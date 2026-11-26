@@ -1,8 +1,8 @@
 // check·advance 명령과 마일스톤 닫힘 알림.
 import { atLeast, loadConfig } from './config.mjs'
-import { F, fail, now, out, read } from './core.mjs'
+import { fail, now, out } from './core.mjs'
 import { orca } from './orca.mjs'
-import { approvalDate, markRoadmapClosed, nextOpenMilestone, parseRoadmap } from './docs.mjs'
+import { approvalDate, markClosed, nextOpenMilestone, readSheet } from './docs.mjs'
 import { gate } from './gates.mjs'
 import { staleList, withCommit } from './stale.mjs'
 import { disabledParts } from './parts.mjs'
@@ -14,7 +14,7 @@ import { cleanMerged } from './worktree.mjs'
 
 export function cmdCheck({ pos, flags }, advance) {
   const target = pos[0]
-  if (!target) fail('사용법: check|advance <roadmap|decide|milestone|check|close> [--milestone Mx]', 2)
+  if (!target) fail('사용법: check|advance <decide|milestone|check|close> [--milestone Mx]', 2)
   const st = loadState()
   const g = gate(target, st, { milestone: flags.milestone })
   if (!g.ok) {
@@ -28,14 +28,11 @@ export function cmdCheck({ pos, flags }, advance) {
   if (g.warnings.length && advance) appendLog('gate_warning', st, { target, warnings: g.warnings })
   if (!advance) return out(`[관문] "${target}" 로 가도 됩니다.`)
   const from = st.stage
-  const rm = parseRoadmap()
+  const rm = readSheet()
   let closedId = null
   let offAtClose = []
-  if (target === 'roadmap') {
-    st.gates.brief_approved = approvalDate(read(F.brief) ?? '')
-    st.stage = 'roadmap'
-  } else if (target === 'decide') {
-    st.gates.roadmap_approved = approvalDate(rm.text)
+  if (target === 'decide') {
+    st.gates.sheet_approved = approvalDate(rm.text)
     st.stage = 'decide'
     st.milestone = flags.milestone
     st.step = null
@@ -55,8 +52,7 @@ export function cmdCheck({ pos, flags }, advance) {
     const sl = staleList(st).map(withCommit)
     if (!st.gates.scene_checked[closedId]) st.gates.scene_pending = { ...(st.gates.scene_pending ?? {}), [closedId]: { at: now(), ...(rh ? { rehearsal: { pass: rh.pass, total: rh.total } } : {}), ...(sl.length ? { stale: sl } : {}) } }
     st.closed.push(st.milestone)
-    const marked = markRoadmapClosed(st.milestone)
-    appendLog('milestone_closed', st, { scene: st.gates.scene_checked[st.milestone], roadmap_marked: marked })
+    appendLog('milestone_closed', st, { scene: st.gates.scene_checked[st.milestone], sheet_marked: markClosed(st.milestone), grade: rm?.grade ?? null })
     const next = nextOpenMilestone(st, rm)
     st.stage = next ? 'decide' : 'done'
     st.milestone = next

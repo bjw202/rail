@@ -4,12 +4,11 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
-import { RAIL, events, put, state, tmp } from './helpers.mjs'
+import { RAIL, events, planDoc, put, state, tmp } from './helpers.mjs'
 
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
 const DONE = '✅ 끝(2026-11-25) 됨'
-const ms = (id) => `## ${id} ${id === 'M0' ? '뼈대' : '기능'}\n- 끝나는 장면: ${id} 화면이 보인다\n- 위험 질문: 없음\n- 예상 기간: 1일\n`
-const ROADMAP = `# 로드맵\n승인: 2026-11-24\n${['M0', 'M1', 'M2'].map(ms).join('')}`
+const PLAN = planDoc([['M0'], ['M1'], ['M2']])
 const BUDGET_OFF = { sinceProgress: { on: false }, milestone: { on: false } }
 const cfg = (mode) => ({ railVersion: '2.9', commitPolicy: 'auto-local', staleTests: 'agent', autonomy: { mode, budget: BUDGET_OFF } })
 const PASS = { total: 3, pass: 3, failed: [], at: '2026-11-25T00:00:00Z' }
@@ -31,7 +30,7 @@ const status = (root) => JSON.parse(run(root, ['status', '--json']).out)
 function repo(mode = 'on') {
   const root = tmp('railstaleq-')
   put(root, '.rail/config.json', JSON.stringify(cfg(mode)))
-  put(root, 'docs/ROADMAP.md', ROADMAP)
+  put(root, 'docs/PLAN.md', PLAN)
   put(root, 'docs/RAIL.md', '# 레일\n레일 2.9판\n')
   put(root, 'docs/plan/M0.md', `# M0\n\n${HEAD}| M0-1 | 기능 | 합계 칸 바꾸기 | src/a.mjs | 없음 | 기준 | ${DONE} |\n`)
   put(root, 'docs/plan/M1.md', `# M1\n\n${HEAD}| M1-1 | 기능 | 다음 기능 | src/b.mjs | 없음 | 기준 | |\n`)

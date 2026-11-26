@@ -58,7 +58,7 @@ describe('독립된 step 동시 진행', () => {
 describe('열린 질문 바꿔 묻기', () => {
   test('ask --replace 는 열린 질문을 닫고 새 질문을 열며 ask_replaced 를 남기고, 사람 답으로 세지 않는다', () => {
     const root = tmp()
-    put(root, '.rail/state.json', JSON.stringify({ ...MILESTONE, stage: 'brief' }))
+    put(root, '.rail/state.json', JSON.stringify({ ...MILESTONE, stage: 'plan' }))
     ok(rail(root, 'ask', '옛 문구 질문'))
     const refused = rail(root, 'ask', '새 문구 질문')
     assert.equal(refused.code, 1)

@@ -6,12 +6,11 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { RAIL, events, git, put, runHook, state, tmp } from './helpers.mjs'
+import { RAIL, events, git, planDoc, put, runHook, state, tmp } from './helpers.mjs'
 
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
 const DONE = '✅ 끝(2026-11-25) 됨'
-const ms = (id, risk = '없음') => `## ${id} ${id === 'M0' ? '뼈대' : '기능'}\n- 끝나는 장면: ${id} 화면이 보인다\n- 위험 질문: ${risk}\n- 예상 기간: 1일\n`
-const ROADMAP = (risks = {}) => `# 로드맵\n승인: 2026-11-24\n${['M0', 'M1', 'M2', 'M3', 'M4'].map((m) => ms(m, risks[m])).join('')}`
+const SHEET = (risks = {}) => planDoc(['M0', 'M1', 'M2', 'M3', 'M4'].map((m) => [m, ...(risks[m] ? [risks[m]] : [])]))
 const BUDGET_OFF = { sinceProgress: { on: false }, milestone: { on: false } }
 const ON = { railVersion: '2.9', commitPolicy: 'auto-local', autonomy: { mode: 'on', budget: BUDGET_OFF } }
 const OFF = { railVersion: '2.9', commitPolicy: 'auto-local', autonomy: { mode: 'off', budget: BUDGET_OFF } }
@@ -32,7 +31,7 @@ function repo({ config = ON, rows = [`| M0-1 | 기능 | 화면 열기 | src/a.mj
   const root = tmp('rail29-')
   put(root, '.rail/config.json', JSON.stringify(config))
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, closed: [], ...st, gates: { scene_checked: {}, rehearsed: {}, ...(st.gates ?? {}) } }))
-  put(root, 'docs/ROADMAP.md', ROADMAP(risks))
+  put(root, 'docs/PLAN.md', SHEET(risks))
   put(root, 'docs/RAIL.md', '# 레일\n레일 2.9판\n')
   put(root, 'docs/plan/M0.md', `# M0\n\n${HEAD}${rows.join('\n')}\n`)
   put(root, '.rail/log.jsonl', log.map((l) => l + '\n').join(''))
@@ -107,7 +106,7 @@ describe('④ 깨우기 교착: 레일 기록은 busy 인데 작업자는 Orca �
 })
 
 describe('② 덜어내기: 단계 순서 검사 하나, 시험 먼저 창 없음', () => {
-  test('부품 목록에 gate:order 하나가 있고 roadmap·decide·milestone·check·step-done 의 통과를 함께 센다', () => {
+  test('부품 목록에 gate:order 하나가 있고 decide·milestone·check·step-done 의 통과를 함께 센다 (기획서 판: roadmap 단계는 없어 세지 않는다)', () => {
     const log = ['roadmap', 'decide', 'milestone', 'check', 'step-done', 'step-start', 'close'].map((t) => line('gate_passed', 'M0', { target: t }))
     const root = repo({ log: [...log, line('milestone_closed', 'M0')] })
     const u = JSON.parse(run(root, ['usage', '--json']).out)
@@ -115,7 +114,7 @@ describe('② 덜어내기: 단계 순서 검사 하나, 시험 먼저 창 없�
     for (const gone of ['gate:roadmap', 'gate:decide', 'gate:milestone', 'gate:check', 'gate:step-done', 'expected-failure', 'gate:step-start', 'validate']) assert.ok(!ids.includes(gone), gone)
     for (const kept of ['gate:order', 'gate:close', 'commit', 'stop-check', 'guard-tests', 'feature-check']) assert.ok(ids.includes(kept), kept)
     const order = u.parts.find((p) => p.id === 'gate:order')
-    assert.deepEqual(order.by.M0, { ran: 5, blocked: 0, off: 0 })
+    assert.deepEqual(order.by.M0, { ran: 4, blocked: 0, off: 0 })
   })
 
   test('step-done 도 단계 순서 검사로 센다', () => {
@@ -271,14 +270,14 @@ describe('③(나) 기능 목록 미리 승인과 장면 판정 대기', () => {
     assert.equal(events(root).at(-1).event, 'plan_approved')
   })
 
-  test('다음 3개 밖, 표 없음, 위험 질문 미결정이면 승인을 거절한다', () => {
-    const root = repo({ risks: { M2: 'D-05 저장 방법' } })
+  test('다음 3개 밖, 표 없음, 착수 전 미결정이면 승인을 거절한다', () => {
+    const root = repo({ risks: { M2: 'D-05' } })
     put(root, 'docs/plan/M2.md', PLAN.replace(/M1-1/g, 'M2-1'))
     put(root, 'docs/plan/M4.md', PLAN.replace(/M1-1/g, 'M4-1'))
     const r = run(root, ['plan', 'approve', 'M1', 'M2', 'M4', '--said', '승인'])
     assert.equal(r.code, 1)
     assert.match(r.err, /M1: docs\/plan\/M1\.md 에 기능 줄이 없습니다/)
-    assert.match(r.err, /M2: 위험 질문 D-05 가 결정되지 않았습니다/)
+    assert.match(r.err, /M2: 착수 전 D-05 가 풀리지 않았습니다/)
     assert.match(r.err, /M4: 지금 마일스톤 뒤의 안 닫힌 마일스톤 3개\(M1, M2, M3\) 안에 없습니다/)
     assert.equal(state(root).gates.plan_approved, undefined)
   })

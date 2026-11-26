@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { RAIL, events, put, tmp } from './helpers.mjs'
+import { RAIL, events, planDoc, put, tmp } from './helpers.mjs'
 
 const MIN = 60_000
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
@@ -19,7 +19,7 @@ function repo({ log = [], cost = 1, config = {} } = {}) {
   const root = tmp('rail-runaway-')
   put(root, '.rail/config.json', JSON.stringify({ railVersion: '2.9', commitPolicy: 'auto-local', notify: { bot: 'coach' }, ...config, autonomy: { mode: 'on', budget: { costCommand: `node ${JSON.stringify(path.join(root, 'cost.mjs'))}`, sinceProgress: { on: true, usd: 10 }, milestone: { on: false }, daily: { on: false } }, ...config.autonomy } }))
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: {} } }))
-  put(root, 'docs/ROADMAP.md', '# 로드맵\n승인: 2026-11-24\n## M0 뼈대\n- 끝나는 장면: 화면이 보인다\n- 위험 질문: 없음\n- 예상 기간: 1일\n')
+  put(root, 'docs/PLAN.md', planDoc([['M0']]))
   put(root, 'docs/RAIL.md', '# 레일\n레일 2.9판\n')
   put(root, 'docs/plan/M0.md', `# M0\n\n${HEAD}| M0-1 | 기능 | 화면 | src/a.mjs | 없음 | 보인다 | ⏳ 진행 중 |\n`)
   put(root, '.rail/log.jsonl', log.map((l) => l + '\n').join(''))

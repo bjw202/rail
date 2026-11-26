@@ -4,7 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
-import { denied, events, git, put, rail, runHook, state, tmp } from './helpers.mjs'
+import { denied, events, git, planDoc, put, rail, runHook, state, tmp } from './helpers.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const today = () => {
@@ -15,7 +15,7 @@ const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 완료 �
 const plan = (...rows) => `# M0\n\n## step\n${HEAD}${rows.map((r) => `${r}\n`).join('')}`
 const ROWS = ['| M0-1 | 시험 | 시험 쓰기 | tests/** | 모듈 없음으로만 실패 | |', '| M0-2 | 구현 | 만들기 | src/** | 전부 통과 | |', '| M0-3 | 리뷰 | 읽기 | (없음) | 보고 | |']
 const MILESTONE = { stage: 'milestone', milestone: 'M0', step: null, closed: [] }
-const ROADMAP = '# 로드맵\n승인: 2026-11-24\n## M0 뼈대\n- 끝나는 장면: 보인다\n- 위험 질문: 없음\n- 예상 기간: 1일\n## M1 다음\n- 끝나는 장면: 또 보인다\n- 위험 질문: 없음\n- 예상 기간: 1일\n\n## 다시 잰 예상\n- M0 끝: 예상 1일 → 실제 1일\n'
+const PLAN = planDoc([['M0'], ['M1']])
 
 // milestone 단계의 임시 레일 폴더. git 을 쓰려면 withGit.
 function railRoot({ rows = ROWS, st = MILESTONE, withGit = false } = {}) {
@@ -85,18 +85,18 @@ describe('step 상태 칸을 코드가 채운다', () => {
     assert.deepEqual(j.steps.map((s) => s.mark), ['✅', '⏳', '  '])
   })
 
-  test('마일스톤은 모든 step 이 ✅ 여야 check 로 가고, 닫으면 ROADMAP 제목에 ✅ (끝 날짜)를 붙인다', () => {
+  test('마일스톤은 모든 step 이 ✅ 여야 check 로 가고, 닫으면 기획서 마일스톤 지도 줄에 ✅ (끝 날짜)를 붙인다', () => {
     const root = railRoot({ rows: [ROWS[0]] })
-    put(root, 'docs/ROADMAP.md', ROADMAP)
+    put(root, 'docs/PLAN.md', PLAN)
     rail(root, 'step-start', 'M0-1')
     rail(root, 'step-done', 'M0-1', '--note', '됨')
     assert.equal(rail(root, 'advance', 'check').code, 0)
     rail(root, 'scene', 'M0', '--result', 'pass', '--note', '봤다')
     assert.equal(rail(root, 'advance', 'close').code, 0)
-    const rm = readFileSync(path.join(root, 'docs/ROADMAP.md'), 'utf8')
-    assert.ok(rm.includes(`## M0 뼈대 ✅ (${today()})\n`), rm)
-    assert.ok(rm.includes('## M1 다음\n'), '다른 마일스톤은 그대로')
-    assert.equal(events(root).find((e) => e.event === 'milestone_closed').roadmap_marked, true)
+    const rm = readFileSync(path.join(root, 'docs/PLAN.md'), 'utf8')
+    assert.ok(rm.includes(`- M0 뼈대 · 장면 S1 · 예상 1일 ✅ (${today()})\n`), rm)
+    assert.ok(rm.includes('- M1 기능 · 장면 S2 · 예상 1일\n'), '다른 마일스톤은 그대로')
+    assert.equal(events(root).find((e) => e.event === 'milestone_closed').sheet_marked, true)
   })
 })
 

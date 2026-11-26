@@ -1,5 +1,6 @@
 .orchestration/
 .rail/.lock
 .rail/state.json.*.tmp
-# 시제품 결과(지시서, 스크린샷, 비교 페이지)는 git 에 넣지 않는다. 공통 틀 .rail/proto/template.md 만 넣는다.
+# 시제품 결과와 가정 시험의 버리는 코드는 git 에 넣지 않는다. 틀(.rail/proto/template.md, .rail/trial/template.md)만 넣는다.
 .rail/proto/*/
+.rail/trial/*/

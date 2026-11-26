@@ -18,13 +18,13 @@ export function readEvents() {
 export function defaultState() {
   return {
     project: path.basename(ROOT),
-    stage: 'brief',
+    stage: 'plan',
     milestone: null,
     step: null,
     waiting_for: 'none',
     human_ask: null,
     interview: { asked: 0 },
-    gates: { brief_approved: null, roadmap_approved: null, risks_decided: {}, scene_checked: {}, rehearsed: {} },
+    gates: { sheet_approved: null, risks_decided: {}, scene_checked: {}, rehearsed: {} },
     closed: [],
     updated: null
   }

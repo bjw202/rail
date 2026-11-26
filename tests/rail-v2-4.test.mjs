@@ -8,20 +8,11 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
-import { RAIL, events, put, state, tmp } from './helpers.mjs'
+import { RAIL, events, planDoc, put, state, tmp } from './helpers.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const ROADMAP = `# 로드맵
-승인: 2026-11-24
-## M0 뼈대 ✅ (2026-11-20)
-- 끝나는 장면: 한 줄이 보인다
-- 위험 질문: 없음
-- 예상 기간: 1일
-## M7 대시보드 다듬기
-- 끝나는 장면: 대시보드가 보기 좋다
-- 위험 질문: D-09 카드 배치, D-10 글꼴
-- 예상 기간: 2일
-`
+// 결정 상태의 원본은 기획서의 그 줄이다(기획서 판). 시제품 카드는 변주와 스크린샷만 맡는다.
+const PLAN = (marks) => planDoc([['M0'], ['M7', 'D-09', 'D-10']], marks)
 const CARD = `# D-09 프로젝트 카드 배치
 상태: 제안
 마일스톤: M7
@@ -65,7 +56,7 @@ appendFileSync(${JSON.stringify(dir)} + '/calls.jsonl', JSON.stringify(args) + '
 const opt = (k) => args[args.indexOf(k) + 1]
 const say = (o) => process.stdout.write(JSON.stringify(o))
 const [a, b] = args
-if (a === 'orchestration' && b === 'worker-start') say({ ok: true, result: { dispatchId: 'ctx_' + opt('--name'), worktree: { path: ${JSON.stringify(path.join(root, 'wt'))} + '/' + opt('--name'), branch: 'bjw/' + opt('--name') } } })
+if (a === 'orchestration' && b === 'worker-start') say({ ok: true, result: { dispatchId: 'ctx_' + opt('--name'), worktree: { path: ${JSON.stringify(path.join(root, 'wt'))} + '/' + opt('--name'), branch: 'user/' + opt('--name') } } })
 else if (a === 'orchestration' && b === 'worker-show') say({ ok: true, result: { state: 'succeeded', stage: 'settled' } })
 else if (a === 'orchestration' && b === 'worker-read') say({ ok: true, result: { report: '시제품 끝' } })
 else if (a === 'orchestration' && ['worker-release', 'worker-stop'].includes(b)) say({ ok: true, result: {} })
@@ -86,7 +77,7 @@ function protoRoot(config = {}) {
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'decide', milestone: 'M7', step: null, closed: ['M0'], gates: { scene_checked: {} } }))
   mkdirSync(path.join(root, '.rail/proto'), { recursive: true })
   copyFileSync(path.join(REPO, 'templates/.rail/proto/template.md'), path.join(root, '.rail/proto/template.md'))
-  put(root, 'docs/ROADMAP.md', ROADMAP)
+  put(root, 'docs/PLAN.md', PLAN())
   put(root, 'docs/decisions/D-09-cards.md', CARD)
   put(root, 'docs/decisions/D-10-font.md', PLAIN)
   return { root, orca: fakeOrca(root) }
@@ -145,7 +136,7 @@ describe('proto start', () => {
     const starts = events(root).filter((e) => e.event === 'worker_start')
     assert.deepEqual(starts.map((e) => [e.step, e.role, e.proto, e.variant]), VARIANTS.map((v) => [`D-09:${v}`, 'proto', 'D-09', v]))
     assert.equal(starts[0].worktree, path.join(root, 'wt', 'proto-D-09-p1-grid'))
-    assert.equal(starts[0].branch, 'bjw/proto-D-09-p1-grid')
+    assert.equal(starts[0].branch, 'user/proto-D-09-p1-grid')
     const next = JSON.parse(run(root, ['next', '--json'], orca.env).out)
     assert.equal(next.stop.code, 'busy')
     assert.match(next.stop.reason, /D-09:p1-grid\(claude, proto\)/)
@@ -238,8 +229,7 @@ describe('proto card 와 proto pick', () => {
     const early = run(root, ['proto', 'pick', 'D-09', 'p2-big'], orca.env)
     assert.equal(early.code, 1)
     assert.match(early.err, /결정이 아직 기록되지 않았습니다/)
-    put(root, 'docs/decisions/D-09-cards.md', readFileSync(path.join(root, 'docs/decisions/D-09-cards.md'), 'utf8').replace('상태: 제안', '상태: 결정됨\n선택: B (p2-big)'))
-    put(root, 'docs/decisions/D-10-font.md', PLAIN.replace('상태: 제안', '상태: 결정됨\n선택: A'))
+    put(root, 'docs/PLAN.md', PLAN({ 'D-09': '결정: 선택함 (B p2-big)', 'D-10': '결정: 선택함 (A)' }))
     assert.match(run(root, ['status'], orca.env).out, /proto pick D-09/)
     assert.equal(run(root, ['proto', 'pick', 'D-09', 'p9'], orca.env).code, 2)
     ok(run(root, ['proto', 'pick', 'D-09', 'p2-big'], orca.env))

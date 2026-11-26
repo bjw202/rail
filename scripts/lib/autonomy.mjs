@@ -4,7 +4,7 @@ import path from 'node:path'
 import { budgetStatus } from './budget.mjs'
 import { autonomy, autonomyOn, commitPolicy, loadConfig } from './config.mjs'
 import { clock, gitIn, isGitTop, out, usd } from './core.mjs'
-import { nextOpenMilestone, parseRoadmap } from './docs.mjs'
+import { nextOpenMilestone, readSheet } from './docs.mjs'
 import { partOff, partSkipped } from './parts.mjs'
 import { appendLog, loadState, readEvents, whoAmI } from './state.mjs'
 import { describe } from './status.mjs'
@@ -42,7 +42,7 @@ export function decideNext({ precheck = false, withBudget = false } = {}) {
   // 2.3판: 멈춤 규칙 넷(human, busy, same_failure, budget)은 부품(stop:<까닭>)이다. 꺼 두면 멈추지 않고 part_disabled 를 남긴다.
   const rule = (code, reason) => (partOff(`stop:${code}`) ? partSkipped(`stop:${code}`, st, { reason }) : stop(code, reason))
   const cache = stopCheckCache()
-  if (st.stage === 'done' && !nextOpenMilestone(st, parseRoadmap())) stop('done', '모든 마일스톤이 닫혔습니다 (ROADMAP 에 새 마일스톤이 없습니다)')
+  if (st.stage === 'done' && !nextOpenMilestone(st, readSheet())) stop('done', '모든 마일스톤이 닫혔습니다 (기획서 마일스톤 지도에 새 마일스톤이 없습니다)')
   if (st.human_ask) rule('human', `사람의 답을 기다립니다 — "${st.human_ask.q}"`)
   if (brokenScenes(st).length) rule('human', `판정 대기였던 ${brokenScenes(st).join(', ')} 의 장면을 사람이 안 됨으로 판정했습니다. 앞 마일스톤 장면이 깨지면 뒤로 가지 않습니다`)
   // 2.9판: 레일 기록에서 열린 작업자도 Orca 쪽에서 이미 끝났을 수 있다(worker_done 알림이 리더를 못 깨운 일, M11-7).

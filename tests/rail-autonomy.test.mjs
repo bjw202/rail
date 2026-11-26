@@ -6,16 +6,10 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { GOOD_BRIEF, RAIL, denied, events, git, makeRepo, put, runHook, state, tmp } from './helpers.mjs'
+import { GOOD_PLAN, RAIL, denied, events, git, makeRepo, planDoc, put, runHook, state, tmp } from './helpers.mjs'
 
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
-const ROADMAP = `# 로드맵
-승인: 2026-11-24
-## M0 뼈대
-- 끝나는 장면: 한 줄이 보인다
-- 위험 질문: 없음
-- 예상 기간: 1일
-`
+const PLAN = planDoc([['M0']])
 const ON = { commitPolicy: 'auto-local', autonomy: { mode: 'on' } }
 
 // 바깥 세션 정보와 진짜 Orca 를 지운 환경으로 rail.mjs 를 부른다.
@@ -47,7 +41,7 @@ function milestoneRoot(config = {}, rows = ['| M0-1 | 구현 | 일 | src/a.mjs |
   const root = tmp('rail22-')
   put(root, '.rail/config.json', JSON.stringify(config))
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {} }, ...st }))
-  put(root, 'docs/ROADMAP.md', ROADMAP)
+  put(root, 'docs/PLAN.md', PLAN)
   put(root, 'docs/plan/M0.md', `# M0\n\n${HEAD}${rows.join('\n')}\n`)
   return root
 }
@@ -544,11 +538,11 @@ describe('부품이 일한 기록 (훅과 관문)', () => {
 
   test('관문이 통과시키면 gate_passed 를 남긴다 (check·advance·step-start·step-done)', () => {
     const root = tmp('rail22-gate-')
-    put(root, 'docs/BRIEF.md', GOOD_BRIEF)
-    ok(run(root, ['check', 'roadmap']))
-    ok(run(root, ['advance', 'roadmap']))
+    put(root, 'docs/PLAN.md', GOOD_PLAN)
+    ok(run(root, ['check', 'decide', '--milestone', 'M0']))
+    ok(run(root, ['advance', 'decide', '--milestone', 'M0']))
     const passed = events(root).filter((e) => e.event === 'gate_passed')
-    assert.deepEqual(passed.map((e) => [e.target, e.via]), [['roadmap', 'check'], ['roadmap', 'advance']])
+    assert.deepEqual(passed.map((e) => [e.target, e.via]), [['decide', 'check'], ['decide', 'advance']])
     const ms = milestoneRoot({})
     ok(run(ms, ['step-start', 'M0-1']))
     ok(run(ms, ['step-done', 'M0-1', '--note', '됨']))

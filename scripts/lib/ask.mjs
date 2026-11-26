@@ -5,7 +5,6 @@ import { answerScene, sceneProblems, sceneQuestion } from './scene.mjs'
 import { staleList } from './stale.mjs'
 import { appendLog, loadState, saveState } from './state.mjs'
 
-export const MAX_QUESTIONS = 8
 // ask: 사람에게 묻는 질문 하나를 기록한다. 한 번에 하나다.
 // --replace: 열린 질문을 닫고 새 질문을 연다(판이 바뀌어 문구가 달라졌을 때 등). ask_replaced 로 남기고 사람 답으로 세지 않는다.
 // --scene: 장면 질문을 이 판이 정한 문구로 만든다(리허설 숫자와 답 예시가 든다).
@@ -22,19 +21,17 @@ export function cmdAsk({ pos, flags }) {
   const old = st.human_ask
   if (old && flags.replace !== true)
     fail(`앞 질문에 아직 답이 없습니다: "${old.q}"\n한 번에 질문은 하나입니다. 먼저 answer 로 답을 기록하세요. 질문을 바꿔 물으려면 ask --replace "<새 질문>" (장면 질문은 ask --scene --replace).`)
-  const kind = scene ? 'scene' : flags.kind ?? (old ? old.kind : st.stage === 'brief' ? 'interview' : 'other')
+  const kind = scene ? 'scene' : flags.kind ?? (old ? old.kind : st.stage === 'plan' ? 'interview' : 'other')
   const sameSlot = old && old.kind === 'interview' && kind === 'interview' // 인터뷰 질문을 바꿔 물으면 질문 수는 그대로다
-  if (kind === 'interview' && !sameSlot) {
-    if (st.interview.asked >= MAX_QUESTIONS) fail(`인터뷰 질문은 ${MAX_QUESTIONS}개까지입니다. 이제 BRIEF.md 를 쓰세요.`)
-    st.interview.asked += 1
-  }
+  // 질문 수에 상한은 없다(기획서 판). 멈춤은 rail-plan 스킬의 규칙(더 물어서 바뀔 것을 한 문장으로 말 못 하면 끝)이 정한다.
+  if (kind === 'interview' && !sameSlot) st.interview.asked += 1
   const stale = scene ? staleList(st).length : 0
   st.human_ask = { q, kind, at: now(), ...(scene ? { milestone: st.milestone, rail: railVersion() } : {}), ...(stale ? { stale } : {}) }
   st.waiting_for = 'human'
   saveState(st)
   if (old) appendLog('ask_replaced', st, { old: old.q, new: q, why: typeof flags.why === 'string' ? flags.why : null, kind, old_kind: old.kind })
   else appendLog('human_ask', st, { q, kind, n: kind === 'interview' ? st.interview.asked : undefined })
-  out(`[${old ? '질문 바꿈' : '질문'}${kind === 'interview' ? ` ${st.interview.asked}/${MAX_QUESTIONS}` : ''}] ${q}`)
+  out(`[${old ? '질문 바꿈' : '질문'}${kind === 'interview' ? ` ${st.interview.asked}${st.interview.asked % 3 ? '' : ' · 이 답을 받으면 지금까지를 되짚어 보인다'}` : ''}] ${q}`)
 }
 
 export function cmdAnswer({ pos }) {

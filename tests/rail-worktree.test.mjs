@@ -6,10 +6,10 @@ import { spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { RAIL, events, git, put, state, tmp } from './helpers.mjs'
+import { RAIL, events, git, planDoc, put, state, tmp } from './helpers.mjs'
 
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
-const ROADMAP = '# 로드맵\n승인: 2026-11-24\n## M0 뼈대\n- 끝나는 장면: 보인다\n- 위험 질문: 없음\n- 예상 기간: 1일\n## M1 기능\n- 끝나는 장면: 보인다\n- 위험 질문: 없음\n- 예상 기간: 1일\n'
+const PLAN = planDoc([['M0'], ['M1']])
 const ROW = (step, status = '⏳ 진행 중', role = '기능') => `| ${step} | ${role} | 화면 | src/ | 없음 | 보인다 | ${status} |`
 
 // 레일 저장소(git) 하나와 그 바깥의 worktree 폴더, 가짜 orca.
@@ -21,7 +21,7 @@ function repo({ isolation = 'worktree', rows = [ROW('M0-1')] } = {}) {
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: {} } }))
   put(root, '.rail/log.jsonl', '')
   put(root, '.gitignore', '.orchestration/\n.rail/.lock\n.rail/state.json.*.tmp\n')
-  put(root, 'docs/ROADMAP.md', ROADMAP)
+  put(root, 'docs/PLAN.md', PLAN)
   put(root, 'docs/RAIL.md', '# 레일\n')
   put(root, 'docs/plan/M0.md', `# M0\n\n${HEAD}${rows.join('\n')}\n`)
   put(root, 'src/a.mjs', 'export const a = 1\n')

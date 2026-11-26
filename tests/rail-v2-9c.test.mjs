@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
-import { GOOD_ROADMAP, RAIL, events, put, state, tmp } from './helpers.mjs'
+import { GOOD_PLAN, RAIL, events, put, state, tmp } from './helpers.mjs'
 
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
 const CONFIG = { railVersion: '2.9', commitPolicy: 'auto-local', autonomy: { mode: 'off' } }
@@ -21,7 +21,7 @@ function root(rows, config = CONFIG) {
   const dir = tmp('rail29c-')
   put(dir, '.rail/config.json', JSON.stringify(config))
   put(dir, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: {} } }))
-  put(dir, 'docs/ROADMAP.md', GOOD_ROADMAP)
+  put(dir, 'docs/PLAN.md', GOOD_PLAN)
   if (rows) put(dir, 'docs/plan/M0.md', `# M0\n\n${HEAD}${rows.join('\n')}${rows.length ? '\n' : ''}`)
   return dir
 }

@@ -9,20 +9,10 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
-import { RAIL, events, git, put, tmp } from './helpers.mjs'
+import { RAIL, events, git, planDoc, put, tmp } from './helpers.mjs'
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const ROADMAP = `# 로드맵
-승인: 2026-11-24
-## M0 뼈대 ✅ (2026-11-20)
-- 끝나는 장면: 한 줄이 보인다
-- 위험 질문: 없음
-- 예상 기간: 1일
-## M7 대시보드 다듬기
-- 끝나는 장면: 대시보드가 보기 좋다
-- 위험 질문: D-09 카드 배치
-- 예상 기간: 2일
-`
+const PLAN = (marks) => planDoc([['M0'], ['M7', 'D-09']], marks)
 const CARD = `# D-09 프로젝트 카드 배치
 상태: 제안
 마일스톤: M7
@@ -41,7 +31,7 @@ const CARD = `# D-09 프로젝트 카드 배치
 B. 이유: 비싼 것이 먼저 보인다.
 `
 const VARIANTS = ['p1-grid', 'p2-big']
-const PREFIX = 'bjw202'
+const PREFIX = 'user7'
 
 function cleanEnv(extra = {}) {
   const env = { ...process.env, ...extra }
@@ -55,7 +45,7 @@ const run = (root, args, env = {}) => {
 const ok = (r) => assert.equal(r.code, 0, r.err + r.out)
 
 // 가짜 Orca CLI: 진짜 Orca 처럼 worker-start 응답에 작업 공간 경로·브랜치를 싣지 않는다.
-// worktree list 는 listed 에 든 변주만 보여 준다(경로는 wt/<이름>, 브랜치는 refs/heads/bjw202/<이름>). worktree rm 은 브랜치를 지우지 않는다.
+// worktree list 는 listed 에 든 변주만 보여 준다(경로는 wt/<이름>, 브랜치는 refs/heads/user7/<이름>). worktree rm 은 브랜치를 지우지 않는다.
 function fakeOrca(root, listed = VARIANTS) {
   const dir = path.join(root, 'fake')
   const rows = listed.map((v) => ({ displayName: `proto-D-09-${v}`, path: path.join(root, 'wt', `proto-D-09-${v}`), branch: `refs/heads/${PREFIX}/proto-D-09-${v}` }))
@@ -92,7 +82,7 @@ function protoRoot({ listed = VARIANTS, withGit = false } = {}) {
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'decide', milestone: 'M7', step: null, closed: ['M0'], gates: { scene_checked: {} } }))
   mkdirSync(path.join(root, '.rail/proto'), { recursive: true })
   copyFileSync(path.join(REPO, 'templates/.rail/proto/template.md'), path.join(root, '.rail/proto/template.md'))
-  put(root, 'docs/ROADMAP.md', ROADMAP)
+  put(root, 'docs/PLAN.md', PLAN())
   put(root, 'docs/decisions/D-09-cards.md', CARD)
   if (withGit) {
     put(root, '.gitignore', '.rail/\nfake/\n')
@@ -135,7 +125,7 @@ describe('proto pick: 실제 브랜치 이름으로 지우기', () => {
     }
     ok(run(root, ['proto', 'card', 'D-09'], orca.env))
     ok(run(root, ['answer', 'p2-big'], orca.env))
-    put(root, 'docs/decisions/D-09-cards.md', readFileSync(path.join(root, 'docs/decisions/D-09-cards.md'), 'utf8').replace('상태: 제안', '상태: 결정됨\n선택: B (p2-big)'))
+    put(root, 'docs/PLAN.md', PLAN({ 'D-09': '결정: 선택함 (B p2-big)' }))
   }
   const branches = (root) => git(root, 'for-each-ref', '--format=%(refname:short)', 'refs/heads').trim().split('\n')
 

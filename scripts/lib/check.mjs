@@ -37,7 +37,7 @@ export function featureProblems(st, row) {
 export function featureHint(st, row, startHint, after) {
   const s = row.step
   const { k, c } = featureState(st, row)
-  const checkSpec = `.rail/check/template.md 의 빈칸만 채워(기능·완료 기준은 표의 ${s} 줄 그대로, 마일스톤 목표는 ROADMAP 의 끝나는 장면, 바뀐 파일은 이 기능 커밋의 git show --stat. 만든 작업자의 대화·보고서 해석은 넣지 않는다) .orchestration/${s}-check-spec.md 로 쓰고 worker start ${s}-check --agent claude --role check`
+  const checkSpec = `.rail/check/template.md 의 빈칸만 채워(기능·완료 기준은 표의 ${s} 줄 그대로, 마일스톤 목표는 기획서의 그 마일스톤 성공 장면, 바뀐 파일은 이 기능 커밋의 git show --stat. 만든 작업자의 대화·보고서 해석은 넣지 않는다) .orchestration/${s}-check-spec.md 로 쓰고 worker start ${s}-check --agent claude --role check`
   const keep = `확인 기록과 재현 시험(.rail/check/${s}.json, .rail/check/${s}/)을 커밋해 잠근다(검사 명령이 돌리지 않으므로 커밋 관문을 지난다)`
   const done = `step-done ${s} --note "<시험 결과와 확인 결과 한 줄>"`
   return {

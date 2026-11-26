@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { DECIDED, GOOD_ROADMAP, RAIL, events, put, state, tmp } from './helpers.mjs'
+import { DECIDED_PLAN, GOOD_PLAN, RAIL, events, put, state, tmp } from './helpers.mjs'
 
 function cleanEnv(extra = {}) {
   const env = { ...process.env, ...extra }
@@ -20,19 +20,19 @@ function run(root, args, env = {}) {
 }
 const ok = (r) => assert.equal(r.code, 0, `${r.out}\n${r.err}`)
 
-// 닫기 직전(check 단계, 장면 확인 pass, step 모두 ✅)인 저장소. ROADMAP 에 "다시 잰 예상" 절이 없다.
+// 닫기 직전(check 단계, 장면 확인 pass, step 모두 ✅)인 저장소. 기획서에 "다시 잰 예상" 절이 없다.
 function closeRoot() {
   const root = tmp('rail26c-')
   put(root, '.rail/config.json', JSON.stringify({ railVersion: '2.6' }))
-  put(root, 'docs/ROADMAP.md', GOOD_ROADMAP)
-  put(root, 'docs/decisions/D-01.md', DECIDED)
+  put(root, 'docs/PLAN.md', GOOD_PLAN)
+  put(root, 'docs/PLAN.md', DECIDED_PLAN)
   put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 완료 기준 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | 가 | src/a.mjs | 기준 | ✅ 끝(2026-11-24) 됨 |\n')
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: { M0: { result: 'pass', note: '봤다' } }, rehearsed: {} } }))
   return root
 }
 
 describe('닫기 관문: 다시 잰 예상', () => {
-  test('ROADMAP 에 "- M0 끝:" 줄이 없어도 닫히고, status 도 그 줄을 쓰라고 하지 않는다', () => {
+  test('기획서에 "- M0 끝:" 줄이 없어도 닫히고, status 도 그 줄을 쓰라고 하지 않는다', () => {
     const root = closeRoot()
     const s = run(root, ['status'])
     ok(s)
@@ -43,12 +43,13 @@ describe('닫기 관문: 다시 잰 예상', () => {
     assert.deepEqual(state(root).closed, ['M0'])
   })
 
-  test('로드맵 꼴 안내에 "다시 잰 예상" 절이 없다', () => {
+  test('기획서 꼴 안내에 "다시 잰 예상" 절이 없다', () => {
     const root = tmp('rail26r-')
-    put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'roadmap', milestone: null, step: null, closed: [], gates: { scene_checked: {} } }))
+    put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'plan', milestone: null, step: null, closed: [], gates: { scene_checked: {} } }))
+    put(root, 'docs/PLAN.md', '# 기획서\n')
     const s = run(root, ['status'])
     ok(s)
-    assert.match(s.out, /ROADMAP\.md 꼴/)
+    assert.match(s.out, /기획서 마무리 — .*plan\/template\.md.*꼴/)
     assert.doesNotMatch(s.out, /다시 잰 예상/)
   })
 })
@@ -57,7 +58,7 @@ describe('닫기 관문: 다시 잰 예상', () => {
 function sceneRoot() {
   const root = tmp('rail26s-')
   put(root, '.rail/config.json', '{}')
-  put(root, 'docs/ROADMAP.md', GOOD_ROADMAP)
+  put(root, 'docs/PLAN.md', GOOD_PLAN)
   put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 완료 기준 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | 가 | src/a.mjs | 기준 | ✅ 끝(2026-11-24) 됨 |\n')
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: {} } }))
   ok(run(root, ['ask', '--scene']))
@@ -123,7 +124,7 @@ else { process.stderr.write('알 수 없는 명령'); process.exit(2) }
 function workerRoot() {
   const root = tmp('rail26w-')
   put(root, '.rail/config.json', JSON.stringify({ commitPolicy: 'auto-local' }))
-  put(root, 'docs/ROADMAP.md', GOOD_ROADMAP)
+  put(root, 'docs/PLAN.md', GOOD_PLAN)
   const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
   put(root, 'docs/plan/M0.md', `# M0\n\n${HEAD}| M0-1 | 시험 | 시험 한 줄 | tests/m0-a.test.mjs | 없음 | 기준 | |\n| M0-2 | 시험 | 다른 시험 | tests/m0-b.test.mjs | 없음 | 기준 | |\n`)
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {} } }))

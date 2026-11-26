@@ -14,8 +14,7 @@ export const RAIL_CMD = `node "${path.resolve(path.dirname(fileURLToPath(import.
 export const F = {
   state: path.join(ROOT, '.rail/state.json'),
   log: path.join(ROOT, '.rail/log.jsonl'),
-  brief: path.join(ROOT, 'docs/BRIEF.md'),
-  roadmap: path.join(ROOT, 'docs/ROADMAP.md'),
+  sheet: path.join(ROOT, 'docs/PLAN.md'),
   decisions: path.join(ROOT, 'docs/decisions'),
   plan: path.join(ROOT, 'docs/plan'),
   config: path.join(ROOT, '.rail/config.json'),

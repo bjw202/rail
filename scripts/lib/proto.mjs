@@ -226,13 +226,13 @@ ${(r.rec?.shots ?? []).map((s) => `<figure><img src="${esc(`${r.v.name}/${s}`)}"
   out(`[질문] ${q}`)
 }
 
-// 사람이 고르고 카드에 "상태: 결정됨"이 적힌 뒤: 고른 변주의 스크린샷을 .rail/reference/Mx/ 로 옮기고(git 에 넣는다), 시제품 작업 공간과 브랜치를 지운다.
+// 사람이 고르고 기획서 그 줄이 "결정: 선택함" 이 된 뒤: 고른 변주의 스크린샷을 .rail/reference/Mx/ 로 옮기고(git 에 넣는다), 시제품 작업 공간과 브랜치를 지운다.
 export function protoPick(id, picks, usage) {
   const st = loadState()
   const c = protoCard(id)
   if (!c?.on) fail(`[시제품] ${id} 는 시제품 카드가 아닙니다 ("시제품: 예" 없음).`)
   const d = decisionStatus(id)
-  if (!d.ok) protoFail(st, 'pick', id, `${id} 의 결정이 아직 기록되지 않았습니다`, [`${d.why}. answer 로 사람의 답을 남기고 카드에 "상태: 결정됨"·"선택:" 을 적은 뒤 부르세요`])
+  if (!d.ok) protoFail(st, 'pick', id, `${id} 의 결정이 아직 기록되지 않았습니다`, [`${d.why}. answer 로 사람의 답을 남기고 기획서 ${id} 줄을 "결정: 선택함 (<변주>)" 으로 고친 뒤 부르세요`])
   const names = c.variants.map((v) => v.name)
   if (!picks.length || picks.some((v) => !names.includes(v))) fail(`${usage}\n${id} 의 변주: ${names.join(', ')}`, 2)
   const ev = readEvents()
@@ -255,7 +255,7 @@ export function protoPick(id, picks, usage) {
   for (const w of openWorkers(st, ev).filter((x) => x.proto === id)) orca(['orchestration', 'worker-stop', '--dispatch', w.dispatch, '--json'], 60_000)
   const seen = new Set()
   for (const w of starts) {
-    // 2.5판: 기록에 경로나 브랜치가 없으면 지우기 전에 Orca 의 작업 공간 목록에서 이름으로 찾는다. 브랜치는 접두어(bjw202/ 등)까지 실제 이름으로 쓴다.
+    // 2.5판: 기록에 경로나 브랜치가 없으면 지우기 전에 Orca 의 작업 공간 목록에서 이름으로 찾는다. 브랜치는 접두어(user/ 등)까지 실제 이름으로 쓴다.
     const found = (!w.worktree || !w.branch) && w.name ? protoWorktree(w.name) : null
     const where = w.worktree ?? found?.path ?? null
     const branch = shortBranch(w.branch) ?? found?.branch ?? protoLocalBranch(w.name)

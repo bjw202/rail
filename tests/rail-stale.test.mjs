@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { GOOD_ROADMAP, RAIL, events, put, state, tmp } from './helpers.mjs'
+import { GOOD_PLAN, RAIL, events, put, state, tmp } from './helpers.mjs'
 
 function run(root, args, extra = {}) {
   const env = { ...process.env, ...extra, RAIL_ROOT: root }
@@ -48,7 +48,7 @@ const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다�
 function workerRoot(staleTests = 'agent') {
   const root = tmp('railstale-')
   put(root, '.rail/config.json', JSON.stringify({ commitPolicy: 'auto-local', staleTests }))
-  put(root, 'docs/ROADMAP.md', GOOD_ROADMAP)
+  put(root, 'docs/PLAN.md', GOOD_PLAN)
   put(root, 'docs/plan/M0.md', `# M0\n\n${HEAD}| M0-1 | 구현 | 합계 칸 바꾸기 | src/a.mjs | 없음 | 기준 | |\n`)
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {} } }))
   for (const s of ['M0-1', 'M0-1-stale']) put(root, `.orchestration/${s}-spec.md`, `# ${s} 일\n\n할 일\n`)
@@ -135,7 +135,7 @@ describe('판정으로 시험 고치기 허락', () => {
 function checkRoot(withStale = true) {
   const root = tmp('railstalec-')
   put(root, '.rail/config.json', JSON.stringify({ staleTests: 'agent' }))
-  put(root, 'docs/ROADMAP.md', GOOD_ROADMAP)
+  put(root, 'docs/PLAN.md', GOOD_PLAN)
   put(root, 'docs/plan/M0.md', `${HEAD}| M0-1 | 구현 | 가 | src/a.mjs | 없음 | 기준 | ✅ 끝(2026-11-25) 됨 |\n`)
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'check', milestone: 'M0', step: null, closed: [], gates: { scene_checked: {}, rehearsed: {} } }))
   const ev = { t: '2026-11-25T00:00:00.000Z', event: 'worker_start', stage: 'milestone', milestone: 'M0', step: 'M0-1', test_edit: true, allowed_by: 'stale', stale_file: '.rail/stale/M0-1.json', stale_lines: [{ file: 'tests/a.test.mjs', line: 3, pinned: '합계 $3.20', changed_by: 'M0-1 할 일 "합계 칸 바꾸기"' }] }

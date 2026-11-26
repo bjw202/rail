@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { GOOD_ROADMAP, RAIL, events, put, state, tmp } from './helpers.mjs'
+import { GOOD_PLAN, RAIL, events, put, state, tmp } from './helpers.mjs'
 
 const NODE = JSON.stringify(process.execPath)
 const exitWith = (code) => `${NODE} -e "process.exit(${code})"`
@@ -26,7 +26,7 @@ const config = (root, c) => put(root, '.rail/config.json', JSON.stringify(c))
 function ready(cfg = {}, rows = ['| M0-1 | 구현 | a | b | c | |']) {
   const root = tmp()
   config(root, cfg)
-  put(root, 'docs/ROADMAP.md', GOOD_ROADMAP + '\n## 다시 잰 예상\n- M0 끝: 예상 3일 → 실제 1일\n')
+  put(root, 'docs/PLAN.md', GOOD_PLAN)
   put(root, 'docs/plan/M0.md', `| step | 맡는 쪽 | 할 일 | 파일 | 완료 | 상태 |\n|---|---|---|---|---|---|\n${rows.join('\n')}\n`)
   put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'milestone', milestone: 'M0', step: null, gates: { scene_checked: {} }, closed: [] }))
   for (const r of rows) {
@@ -125,7 +125,7 @@ describe('장면 리허설 관문', () => {
   test('check 단계 중간에 2.0판으로 바뀌면 verify 와 리허설을 그 자리에서 요구하고, 닫힌 마일스톤은 다시 보지 않는다', () => {
     const root = tmp()
     config(root, { railVersion: '1.2' })
-    put(root, 'docs/ROADMAP.md', GOOD_ROADMAP + '\n## 다시 잰 예상\n- M0 끝: 예상 3일 → 실제 1일\n- M1 끝: 예상 1주 → 실제 1일\n')
+    put(root, 'docs/PLAN.md', GOOD_PLAN)
     put(root, 'docs/plan/M0.md', '| step | 맡는 쪽 | 할 일 | 파일 | 완료 | 상태 |\n|---|---|---|---|---|---|\n| M0-1 | 구현 | a | b | c | ✅ 끝(2026-11-20) 됨 |\n')
     put(root, 'docs/plan/M1.md', '| step | 맡는 쪽 | 할 일 | 파일 | 완료 | 상태 |\n|---|---|---|---|---|---|\n| M1-1 | 구현 | a | b | c | |\n')
     // M0 은 1.2판으로 리허설 없이 닫혔다.
