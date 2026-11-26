@@ -287,7 +287,7 @@ function fakeOrca(root, { show = { state: 'succeeded', stage: 'settled' }, worke
   put(root, 'fake/layout.json', JSON.stringify({ type: 'terminal', handle: 'term_leader', title: '리더' }))
   put(root, 'fake/show.json', JSON.stringify(show))
   const body = `#!/usr/bin/env node
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, rmdirSync, writeFileSync } from 'node:fs'
 const dir = ${JSON.stringify(dir)}
 const args = process.argv.slice(2)
 appendFileSync(dir + '/calls.jsonl', JSON.stringify(args) + '\\n')
@@ -296,6 +296,8 @@ const say = (o) => process.stdout.write(JSON.stringify(o))
 const layout = () => JSON.parse(readFileSync(dir + '/layout.json', 'utf8'))
 const save = (t) => writeFileSync(dir + '/layout.json', JSON.stringify(t))
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+// 진짜 Orca 처럼 창 닫기를 한 번에 하나씩 한다(두 worker done 이 동시에 닫아도 서로 덮어쓰지 않게).
+const locked = (f) => { for (let i = 0; ; i++) { try { mkdirSync(dir + '/layout.lock'); break } catch { if (i > 2000) throw new Error('배치 잠금'); sleep(5) } } try { f() } finally { rmdirSync(dir + '/layout.lock') } }
 const [a, b] = args
 if (a === 'terminal' && b === 'list') say({ ok: true, result: { terminals: [], visualLayouts: [{ root: { type: 'group', tabs: [{ tabId: 'tab1', panes: layout() }] } }] } })
 else if (a === 'terminal' && b === 'split') {
@@ -306,7 +308,7 @@ else if (a === 'terminal' && b === 'split') {
   say({ ok: true, result: { split: { handle: h, tabId: 'tab1', leafId: 'leaf' } } })
 } else if (a === 'terminal' && b === 'close') {
   const drop = (n) => (n.first ? (n.first.handle === opt('--terminal') ? n.second : n.second.handle === opt('--terminal') ? n.first : { ...n, first: drop(n.first), second: drop(n.second) }) : n)
-  save(drop(layout()))
+  locked(() => save(drop(layout())))
   say({ ok: true, result: { close: { handle: opt('--terminal') } } })
 } else if (a === 'terminal') say({ ok: true, result: { wait: { satisfied: true } } })
 else if (a === 'orchestration' && b === 'worker-start') {
