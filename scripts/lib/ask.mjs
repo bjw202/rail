@@ -1,5 +1,6 @@
 // 사람에게 묻고 답을 받는 명령: ask, answer.
 import { fail, now, out } from './core.mjs'
+import { readPlan } from './plan.mjs'
 import { answerScene, sceneProblems, sceneQuestion } from './scene.mjs'
 import { staleList } from './stale.mjs'
 import { appendLog, loadState, saveState } from './state.mjs'
@@ -41,7 +42,7 @@ export function cmdAnswer({ pos }) {
   const ask = st.human_ask
   const waitSec = Math.round((Date.now() - Date.parse(ask.at)) / 1000)
   if (ask.kind === 'scene') return answerScene(st, ask, text, waitSec)
-  appendLog('human_answer', st, { q: ask.q, kind: ask.kind, text, wait_sec: waitSec })
+  appendLog('human_answer', st, { q: ask.q, kind: ask.kind, text, wait_sec: waitSec, ...(ask.kind === 'approve' && /^이대로 시작할까요/.test(ask.q) ? { steps: readPlan(st.milestone)?.rows.map((r) => r.step) } : {}) })
   st.human_ask = null
   st.waiting_for = 'none'
   saveState(st)

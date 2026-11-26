@@ -248,7 +248,7 @@ describe('압축 이어받기', () => {
     return root
   }
 
-  test('PreCompact 훅은 위치·진행 중 작업자·열린 질문 원문·최근 rail_gap 을 내고, 규칙 원문은 내지 않고, compact_started 를 남긴다', () => {
+  test('PreCompact 훅은 위치·진행 중 작업자·열린 질문 원문을 내고(rail_gap 기록은 읽지 않는다), 규칙 원문은 내지 않고, compact_started 를 남긴다', () => {
     const root = compactRoot()
     const r = runHook('pre-compact.mjs', { cwd: root, hook_event_name: 'PreCompact', trigger: 'auto', session_id: 'sess-1', custom_instructions: null })
     assert.equal(r.code, 0, r.stderr)
@@ -257,7 +257,7 @@ describe('압축 이어받기', () => {
     assert.match(o, /진행 중 step M0-1/)
     assert.match(o, /M0-1: agent claude, role impl, dispatch ctx_abc123, terminal term_w1/)
     assert.ok(o.includes('"결정 카드 D-02 에서 A 와 B 중 무엇을 고를까요? (원문 그대로)"'))
-    assert.match(o, /틈-하나: 압축 뒤 작업자를 잃는다/)
+    assert.ok(!/rail_gap|틈-하나/.test(o), '아무도 남기지 않는 rail_gap 은 읽지 않는다')
     assert.match(o, /요약하지 말 것: CLAUDE\.md, docs\/RAIL\.md/)
     assert.ok(!/원문규칙-/.test(o), '규칙 원문은 지시에 넣지 않는다')
     assert.ok(o.length < 10_000)

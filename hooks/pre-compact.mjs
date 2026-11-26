@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // PreCompact 훅: 표준 출력이 압축 요약 지시가 된다(Claude Code 가 1만 자에서 자른다).
-// 지시는 rail.mjs precompact 가 레일 상태(위치, 진행 중 작업자, 열린 사람 질문, 최근 rail_gap)로 만들고 compact_started 를 남긴다.
+// 지시는 rail.mjs precompact 가 레일 상태(위치, 진행 중 작업자, 열린 사람 질문)로 만들고 compact_started 를 남긴다.
 // 압축을 막지 않는다: 레일이 없거나 고장 나도 아무것도 내지 않고 종료 코드 0 으로 끝낸다.
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'

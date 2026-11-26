@@ -53,7 +53,7 @@ export function cardHint(d, m, st) {
 const livingHint = (sh, m, st) => {
   if (new RegExp(`\\b${m}\\b`).test(sh?.living.join('\n') ?? '')) return ''
   const g = unplanned(st, sh)
-  return `먼저 기획서 "## 살아 있는 세 줄"을 ${m} 기준으로 고친다(- 깨진 가정: / - 계획 밖 결정: ${g?.id === m ? `누적 ${g.total}번 (${m} ${g.now})` : `<누적 N번> (${m} <이번 수>)`} · 계획 변경: / - 다음 장면:). 그다음 `
+  return `먼저 기획서 "## 살아 있는 세 줄"을 ${m} 기준으로 고친다(- 깨진 가정: / - 계획 밖 결정: ${g?.id === m ? `누적 ${g.total}번 (${m} ${g.now})` : `<누적 N번> (${m} <이번 수>)`} · 계획 변경: / - 다음 장면:). "## 나중에" 도 본다. 그다음 `
 }
 export const SCENE_PREP = (m) =>
   `점검표 .rail/rehearsal/${m}/checklist.md 를 쓰고(0번은 "지금 화면이 오늘 빌드인가") 명세 .orchestration/${m}-rehearsal-spec.md 로 worker start ${m}-rehearsal --agent claude --role rehearsal. 리허설 작업자는 항목마다 .rail/rehearsal/${m}/<번호>.png 와 result.json({"items":[{"id":"0","check":"<항목>","result":"pass|fail","saw":"<본 숫자 한 줄>","shot":"0.png"}]})을 쓰고 rehearsal-record ${m}`
@@ -107,9 +107,12 @@ export function describe(st) {
       const open = rows.filter((r) => !isDone(r.status))
       const left = `(남은 ${open.length}/${rows.length})`
       const ready = startable(plan, st).map((r) => r.step)
-      const also = ready.length ? ` · 함께 시작할 수 있는 step: ${ready.join(', ')} (각각 step-start)` : ''
-      // 새 표의 첫 시작 전에는 사람의 표 승인이 먼저다(자율 모드면 묻지 않는다).
-      const fresh = !autonomyOn() && !st.gates.plan_approved?.[m] && rows.every((r) => !isDone(r.status) && !isActive(r.status)) ? '표를 사람이 승인하지 않았으면 표를 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve 로 묻고 턴을 끝내기. 승인됐으면 ' : ''
+      // 새 표의 첫 시작 전에는 사람의 표 승인이 먼저다(자율 모드면 묻지 않는다). 승인 뒤 더한 기능 줄(표 승인 답·auto_start 가 남긴 줄 목록에 없는 줄)도 시작 전에 승인을 안내한다. 막지는 않는다.
+      const base = readEvents().findLast((e) => e.milestone === m && e.steps?.length && (e.event === 'auto_start' || e.kind === 'approve'))?.steps
+      const added = base ? ready.filter((id) => isFeatureRole(row(id)) && !base.includes(id)).join(', ') : ''
+      const plus = !added ? '' : autonomyOn() ? `자율 모드: 승인 뒤 더한 기능 ${added} 은(는) 기본으로 기획서 "## 나중에" 로 옮기고 표에서 뺀다. 지금 장면을 깨는 문제를 고치는 줄이면 ` : `표 승인 뒤 더한 기능 줄 ${added} 을(를) 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve 로 묻고 턴을 끝내기. 승인 답이 오면 `
+      const also = ready.length ? ` · 함께 시작할 수 있는 step: ${ready.join(', ')} (${plus}각각 step-start)` : ''
+      const fresh = !autonomyOn() && !st.gates.plan_approved?.[m] && rows.every((r) => !isDone(r.status) && !isActive(r.status)) ? '표를 사람이 승인하지 않았으면 표를 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve 로 묻고 턴을 끝내기. 승인됐으면 ' : plus
       if (doing.length === 1) next = `step ${doing[0]} 진행 중 — ${go(doing[0])}${also} ${left}`
       else if (doing.length)
         next = `step ${doing.join(', ')} 동시 진행 중 — 끝나는 대로 하나씩(한꺼번에 하지 않는다): 작업자의 worker_done 이 오면 worker done <step> → 그 step 만 커밋 관문(다른 step 이 아직 쓰는 파일 때문에 checkCommand 가 실패하면 그 step 이 끝난 뒤 다시) → step-done <step> --note "<한 줄>"${doing.some((id) => isolated(roleFlag(row(id)))) ? ' (worktree 방식의 만드는 step 은 커밋 관문을 그 worktree 에서 먼저 하고, 그다음 worker done 이 합친다)' : ''}${doing.some(feat) ? ` · 기능 줄은 step-done 전에 확인 step: ${doing.filter(feat).map((id) => `${id}: ${go(id)}`).join('; ')}` : ''}${doing.some((id) => !hasWorker.has(id) && !feat(id)) ? ` · 작업자가 없는 step: ${doing.filter((id) => !hasWorker.has(id) && !feat(id)).map((id) => startHint(row(id))).join('; ')}` : ''}${also} ${left}`
@@ -164,7 +167,6 @@ export function describe(st) {
   if (pending.length) waiting = `${waiting === '없음' ? '' : `${waiting} · `}사람 장면 판정 대기: ${pendingText(st)} (사람이 말하면 scene <Mx> --result pass|fail --note "<본 것>")`
   return { position: pos, waiting, next, skill, violations: v, grade: gradeLine(unplanned(st, rm)) ?? null }
 }
-
 
 export function cmdStatus({ flags }) {
   // 훅으로 불리면 입력의 session_id 를 리더 세션으로 적는다. 압축 뒤의 세션 시작은 compact 매처 항목(--compact)이 맡는다.
@@ -225,7 +227,6 @@ export function cmdPrecompact() {
   const plan = st.milestone ? readPlan(st.milestone) : null
   const doing = plan ? activeRows(plan, st).map((r) => r.step) : st.step ? [st.step] : []
   const workers = openWorkers(st, ev)
-  const gaps = ev.filter((e) => e.event === 'rail_gap').slice(-3)
   const ask = st.human_ask
   const cut = (t, n) => (String(t).length > n ? `${String(t).slice(0, n - 1)}…` : String(t))
   const text = [
@@ -236,8 +237,6 @@ export function cmdPrecompact() {
     `- 진행 중 작업자: ${workers.length ? '' : '없음'}`,
     ...workers.map((w) => `  - ${w.step}: agent ${w.agent ?? '?'}, role ${w.role ?? '?'}, dispatch ${w.dispatch ?? '?'}, terminal ${w.terminal ?? '?'}`),
     `- 열린 사람 질문 (원문 그대로): ${ask ? `"${cut(ask.q, 2000)}" (종류 ${ask.kind}, ${ask.at} 에 물음)` : '없음'}`,
-    `- 최근 rail_gap: ${gaps.length ? '' : '없음'}`,
-    ...gaps.map((g) => `  - ${g.t} ${g.where ?? ''}: ${cut(g.what ?? g.note ?? '', 400)}`),
     `요약하지 말 것: CLAUDE.md, docs/RAIL.md, .claude/skills/rail*/ 의 규칙. 파일에 있으니 압축 뒤 다시 읽는다. 규칙을 요약에 옮겨 적지 마라.`,
     `압축 뒤 할 일: docs/RAIL.md 와 지금 마일스톤의 step 표를 다시 읽고, ${RAIL_CMD} status 로 진행 중 작업자를 확인한 뒤 이어서 한다.`
   ].join('\n')

@@ -10,7 +10,6 @@ import { activeRows, inScope, isActive, isFeatureRole, isTestRole, readPlan, wri
 import { appendLog, readEvents, saveState } from './state.mjs'
 import { leftWorktrees } from './worktree.mjs'
 
-
 export function cmdStepStart({ pos }) {
   const stepId = pos[0]
   if (!stepId) fail('사용법: step-start <step>', 2)
