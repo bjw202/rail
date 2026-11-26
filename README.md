@@ -2,6 +2,8 @@
 
 AI 코딩 작업을 **기획 → 마일스톤 → 확인**의 순서로 끌고 가는 작은 도구입니다.
 
+이 문서는 설치하고 쓰는 법입니다. 속이 어떻게 돌아가는지(명령마다 어떤 파일과 훅이 움직이는지, 누가 무엇을 판정하는지, 모듈 지도, 상태와 기록의 칸)는 [HOW-IT-WORKS.md](HOW-IT-WORKS.md)에 있습니다.
+
 ## 목차
 
 1. [레일이 무엇인가](#1-레일이-무엇인가)
@@ -51,6 +53,8 @@ AI 코딩 작업을 **기획 → 마일스톤 → 확인**의 순서로 끌고 �
 3. **마일스톤** — 이번 마일스톤만 step 표(`docs/plan/M0.md`, 할 일 줄의 목록)로 나눕니다. 기본은 "기능 줄 하나 = 사용자가 알아볼 기능 하나"이고, 작업자(Orca 창에 띄운 Claude 또는 Codex 세션) 하나가 시험과 구현을 함께 합니다. 끝나면 만들지 않은 새 작업자가 완료 기준을 어기는 경우를 찾습니다(확인). 마지막 줄은 Codex 의 마지막 리뷰입니다.
 4. **장면 확인** — 리허설 작업자(구현하지 않은 작업자)가 실제 앱을 띄워 점검표를 해 보고 스크린샷을 남깁니다. 사람은 그 결과를 보고 "됨/안 됨"과 본 것 한 줄을 답합니다(장면 판정).
 5. **닫기** — 기획서 끝의 "살아 있는 세 줄"(깨진 가정, 계획 밖 결정 수와 계획 변경, 다음 장면)을 고치고 마일스톤을 닫습니다. "계획 밖 결정"은 마일스톤을 시작한 뒤 기획서 "결정과 시험"에 새로 생긴 번호 수이고, 레일이 직접 셉니다.
+
+각 순간에 어떤 명령·파일·훅이 움직이는지는 [HOW-IT-WORKS 2절](HOW-IT-WORKS.md#2-한-바퀴-따라가기)에 한 줄씩 적었습니다.
 
 ## 3. 사람이 하는 일
 
@@ -174,7 +178,7 @@ cd C:\projects\my-app; rail-install
 - **바뀌는 것:** `.rail/bin/`, `.rail/hooks/`, `.claude/skills/rail*/` 의 레일 파일, `.claude/settings.json` 의 레일 훅 줄, `.rail/installed.json`. 지난 판에만 있던 레일 파일은 지웁니다(설치 목록에 있던 것만 지우므로 `.rail/bin/` 에 직접 둔 비용 명령 같은 파일은 남습니다).
 - **안 바뀌는 것:** `.rail/config.json`, 시작 틀, `docs/RAIL.md`, 상태와 기록, 기획서와 step 표.
 - 다시 돌렸는데 바뀐 것이 없으면 "바뀐 파일 없음"이 나옵니다. 두 번 돌려도 훅이 두 번 들어가지 않습니다.
-- 이미 레일을 쓰는 레포에 커밋 안 된 변경(레일 기록 `.rail/state.json`·`.rail/log.jsonl` 과 step 표는 빼고)이 있거나 작업자가 도는 중이면, 업데이트하지 않고 까닭을 보여 줍니다. 먼저 커밋하거나 작업자가 끝나기를 기다린 뒤 다시 칩니다. 그 상태를 알고도 꼭 지금 바꿔야 할 때만(예: 레일 고장 때문에 작업자를 닫을 수 없을 때) `rail-install --force` 를 씁니다.
+- 이미 레일을 쓰는 레포(`.rail/installed.json` 이나 `.rail/state.json` 이 있는 레포)에 커밋 안 된 변경이 있거나 작업자가 도는 중이면, 업데이트하지 않고 까닭을 보여 줍니다. 커밋 안 된 변경에는 새 파일도 들고, 레일 기록(`.rail/state.json`, `.rail/log.jsonl`, `.rail/test-baseline.json`)과 step 표 폴더(`docs/plan/`)는 뺍니다. 먼저 커밋하거나 작업자가 끝나기를 기다린 뒤 다시 칩니다. 그 상태를 알고도 꼭 지금 바꿔야 할 때만(예: 레일 고장 때문에 작업자를 닫을 수 없을 때) `rail-install --force` 를 씁니다.
 - `.claude/settings.json` 이 깨져 있으면(주석, 끝 쉼표 등) 아무 파일도 쓰지 않고 멈춥니다. 고친 뒤 다시 칩니다.
 - 바뀐 파일이 있으면 마지막 줄에 따로 커밋하라는 안내가 나옵니다: `git add .rail .claude docs/RAIL.md .gitignore` 를 한 뒤 `git commit -m "rail 업데이트"`. 제품 작업과 섞지 않으면 나중에 무엇이 레일 때문에 바뀌었는지 가려 보기 쉽습니다.
 - 시작 틀이나 `docs/RAIL.md` 를 새 판으로 바꾸고 싶으면 그 파일을 지운 뒤 설치를 다시 돌립니다.
@@ -187,10 +191,10 @@ cd C:\projects\my-app; rail-install
 |---|---|
 | `/rail` | 거의 모든 순간. "다음 뭐 해?", "어디까지 했지?"도 됩니다 |
 | `node .rail/bin/rail.mjs status` | 터미널에서 위치 세 줄만 보고 싶을 때 |
-| `node .rail/bin/rail.mjs usage` | 부품마다 마일스톤별로 몇 번 일하고 막았는지 볼 때 |
+| `node .rail/bin/rail.mjs usage [--json]` | 부품마다 마일스톤별로 몇 번 일하고 막았는지와 빼기 후보를 볼 때 |
 | `rail-install` (제품 레포 폴더에서), 또는 `node <원본>/scripts/install.mjs <레포>` | 설치와 업데이트. 일이 진행 중인데도 밀어붙일 때만 `--force` |
 
-정책 바꾸기(`policy set …`, `plan approve …`)는 사람이 리더 세션에 말하면 리더가 사람 말을 `--said` 에 그대로 넣어 부릅니다. 사람이 직접 칠 일은 거의 없습니다.
+정책 바꾸기(`policy set …`, `plan approve …`)는 사람이 리더 세션에 말하면 리더가 사람 말을 `--said` 에 그대로 넣어 부릅니다. 사람이 직접 칠 일은 거의 없습니다. 코드가 `--said` 를 꼭 요구하는 것은 `isolation` 바꾸기, 부품 끄기, `plan approve` 이고, 커밋 정책과 자율 모드는 리더가 스킬 규칙으로 지킵니다.
 
 ### 리더가 쓰는 것 (`node .rail/bin/rail.mjs <명령>`)
 
@@ -199,21 +203,24 @@ cd C:\projects\my-app; rail-install
 | 명령 | 하는 일 |
 |---|---|
 | `status [--json]` | 위치, 기다리는 것, 다음 할 일, 기획 성적, 열린 작업자, step 표 |
-| `next [--json] [--precheck]` | 자율 모드의 할 일과 멈춤 까닭. `--precheck` 는 종료 코드로 답한다(9절) |
-| `ask "<질문>" [--kind interview\|approve\|decide]`, `ask --scene` | 사람에게 묻는 질문 하나를 기록 |
+| `next [--json] [--precheck] [--budget]` | 자율 모드의 할 일과 멈춤 까닭. `--precheck` 는 종료 코드로 답한다(9절). `--budget` 은 다른 까닭으로 멈춰도 예산을 잰다 |
+| `ask "<질문>" [--kind interview\|approve\|decide]`, `ask --scene`, `ask --replace …` | 사람에게 묻는 질문 하나를 기록. 앞 질문에 답이 없으면 거절하고, `--replace` 만 바꿔 묻는다 |
 | `answer "<사람의 답>"` | 사람의 답을 그대로 기록 |
 | `check <단계>`, `advance <decide\|milestone\|check\|close> [--milestone Mx]` | 다음 단계로 가도 되는지 보기 / 가기 |
 | `step-start <step>`, `step-done <step> --note "<한 줄>" [--commit <해시>]` | step 표의 상태 칸을 채움 |
-| `worker start <step> --agent claude\|codex --role <역할>`, `worker done <step>` | 작업자 창을 띄우고 닫음 |
+| `worker start <step> --agent claude\|codex --role <역할> [--spec-file …] [--name …]`, `worker done <step> [--note …] [--result ok\|fail] [--force]` | 작업자 창을 띄우고 닫음. 역할은 `feature`·`check`·`fix`·`test`·`impl`·`review`·`final-review`·`rehearsal`·`stale`. `--force` 는 아직 일하는 작업자를 버릴 때만(사람이 정함) |
 | `verify` | 바깥 정답 검증기를 돌림 |
 | `rehearsal-record <Mx>` | 리허설 결과를 기록 |
 | `scene <Mx> --result pass\|fail --note "<본 것>"` | 질문 밖에서 받은 장면 판정을 기록 |
 | `reopen [--self-fix]` | 장면 실패 뒤 step 진행으로 되돌림 |
-| `policy [show]`, `policy set …` | 커밋 정책, 자율 모드, isolation, 부품 끄기(사람 말이 있어야 함) |
+| `policy [show]`, `policy set …` | 커밋 정책, 자율 모드, isolation, 부품 끄고 켜기(사람만 정함) |
+| `part <부품>` | 부품 하나가 켜졌는지 묻기(꺼졌으면 종료 코드 1). 커밋 관문 앞에서 `part commit` 으로 씀 |
 | `plan approve <Mx> … --said "<사람 말>"` | 뒤 마일스톤 기능 목록 미리 승인 |
 | `worktree [list] \| merge <step> \| clean` | 작업자 worktree 다루기 |
 | `log <사건> [json]` | 사건 기록에 한 줄 |
 | `proto start\|record\|card\|pick` | 시제품(봐야 아는 결정에 붙이는 버리는 화면) |
+
+`leader`, `precompact` 는 훅이 부르는 명령이라 직접 쓸 일이 없습니다. 명령마다 어느 모듈이 일하는지는 [HOW-IT-WORKS 4절](HOW-IT-WORKS.md#4-모듈-지도)에 있습니다.
 
 ## 8. 설정 (`.rail/config.json`)
 
@@ -222,9 +229,9 @@ cd C:\projects\my-app; rail-install
 | 칸 | 뜻 | 기본 |
 |---|---|---|
 | `railVersion` | 레일 판 이름표. `status` 첫 줄과 훅 머리에 보입니다. 동작은 바꾸지 않습니다 | 틀에는 `"2.9"` |
-| `checkCommand` | 마무리 검사 훅과 커밋 관문이 돌리는 시험 명령. 비면 마무리 검사를 건너뜁니다 | 틀에는 `"node --test"` |
-| `verify` | 바깥 정답 검증기 목록 `[{ "name", "command", "why" }]`. 종료 코드 0 통과, 3 건너뜀, 그 밖은 실패 | `[]` |
-| `appStart` | 확인·리허설 작업자가 앱을 띄우는 명령 | `""` |
+| `checkCommand` | 마무리 검사 훅이 돌리고, 커밋 관문에서 리더가 직접 돌리는 시험 명령. 비면 마무리 검사를 건너뜁니다 | 틀에는 `"node --test"` |
+| `verify` | 바깥 정답 검증기 목록 `[{ "name", "command", "why", "timeoutSec" }]`. 종료 코드 0 통과, 3 건너뜀, 그 밖은 실패. `timeoutSec` 은 하나당 시간 상한 | `[]`, `timeoutSec` 은 900초 |
+| `appStart` | 확인·리허설 작업자가 앱을 띄우는 명령. 레일 코드는 읽지 않고 작업자 지시서가 이 명령을 쓰라고 합니다 | `""` |
 | `commitPolicy` | `ask`(커밋마다 묻기) 또는 `auto-local`(묻지 않고 로컬 커밋, 푸시 안 함). 사람만 바꿈 | `ask` |
 | `isolation` | `shared`(모두 한 폴더) 또는 `worktree`(만드는 작업자마다 git worktree). 사람만 바꿈 | `shared` |
 | `worktreeDir` | worktree 를 만들 폴더 | `~/orca/workspaces/<레포 폴더 이름>` |
@@ -264,6 +271,8 @@ cd C:\projects\my-app; rail-install
 | `error` | 상태 파일을 못 읽음, 또는 비용 명령이 있는데 실패 | 15 |
 | `off` | 자율 모드가 꺼짐 | 16 |
 
+까닭이 여럿 겹치면 처음 걸린 하나만 나옵니다. 보는 순서는 done → human → busy → same_failure → off → budget 이라서, 자율 모드가 꺼져 있어도 열린 질문이 있으면 `off`(16) 대신 `human`(11)이 나옵니다. 예산은 앞에서 멈추지 않았을 때만 잽니다. 자세한 조건은 [HOW-IT-WORKS 7절](HOW-IT-WORKS.md#7-자율-모드-고리)에 있습니다.
+
 **비용 명령.** `autonomy.budget.costCommand` 가 비어 있으면 예산 규칙을 쓰지 않고, `status` 에 "[경고] 비용 명령(…)이 비어 예산 규칙을 쓰지 않습니다" 한 줄만 냅니다. 멈추지는 않습니다. 비용 명령이 있는데 실패하면 안전한 쪽으로 멈춥니다(`error`).
 
 **Orca 자동화로 리더 깨우기 (예시).** 30분마다 `next --precheck` 를 돌려 할 일이 있을 때만 리더에게 "/rail 로 이어서 진행"을 보내게 합니다. 아래는 모양을 보이는 예시이고, 정확한 옵션은 `orca automations create --help` 로 확인하세요.
@@ -296,25 +305,26 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
 |---|---|---|
 | 세션 시작 (`status --hook`) | Claude Code 세션을 열 때 | 위치 세 줄을 보여 주고 "레일로 진행합니다"를 알립니다 |
 | 압축 직후 (`status --hook --compact`) | 대화가 압축된 뒤 | 위치와 다시 읽을 파일을 알려 이어받게 합니다 |
-| 시험 잠금 (`.rail/hooks/guard-tests.mjs`) | 파일을 고치거나 셸 명령(Bash 도구, Windows 의 PowerShell 도구)을 쓰기 직전 | 이미 있는 시험 파일(git 이 추적하는 `tests/`·`test/`·`fixtures/`·`*.test.*`·`*.spec.*`, 시험 step 이 끝날 때 찍은 기준선에 든 파일)을 고치거나 지우지 못하게 합니다. 새 시험 파일은 만들 수 있습니다. 우회는 `RAIL_ALLOW_TEST_EDIT=1` 을 붙여 띄운 세션만 됩니다 |
-| 마무리 검사 (`.rail/hooks/stop-check.mjs`) | 세션이 멈추려 할 때 | 제품 파일이 바뀌었으면 `checkCommand` 를 돌리고, 실패하면 멈추지 못하게 붙잡아 고치게 합니다. 같은 실패는 두 번까지만 붙잡고, 사람 답을 기다리는 동안은 붙잡지 않습니다 |
+| 시험 잠금 (`.rail/hooks/guard-tests.mjs`) | 파일을 고치거나 셸 명령(Bash 도구, Windows 의 PowerShell 도구)을 쓰기 직전 | 이미 있는 시험 파일(git 이 추적하는 `tests/`·`test/`·`fixtures/`·`__tests__/`·`*.test.*`·`*.spec.*`, 그리고 시험 step 이 끝날 때 찍은 기준선에 든 파일)을 고치거나 지우지 못하게 합니다. 새 시험 파일은 만들 수 있습니다. 우회는 `RAIL_ALLOW_TEST_EDIT=1` 을 붙여 띄운 세션만 됩니다 |
+| 마무리 검사 (`.rail/hooks/stop-check.mjs`) | 세션이 멈추려 할 때 | 제품 파일이 바뀌었으면(문서 `.md` 만 바뀐 것은 빼고) `checkCommand` 를 돌리고, 실패하면 멈추지 못하게 붙잡아 고치게 합니다. 같은 실패는 이어서 두 번까지만 붙잡고, 사람 답을 기다리는 동안은 붙잡지 않고, 5분이 넘으면 경고만 합니다 |
 | 압축 직전 (`.rail/hooks/pre-compact.mjs`) | 대화를 압축하기 직전 | 위치·열린 작업자·열린 질문을 요약에 글자 그대로 남기라고 지시합니다 |
 
-작업자도 같은 레포 설정을 읽으므로 같은 훅이 걸립니다. 작업자 창에서 이미 있는 시험 파일을 고치려 하면 막힙니다.
+작업자도 같은 레포 설정을 읽으므로 같은 훅이 걸립니다. 작업자 창에서 이미 있는 시험 파일을 고치려 하면 막힙니다. 훅마다 무엇을 보고 무엇을 남기는지는 [HOW-IT-WORKS 6절](HOW-IT-WORKS.md#6-훅-다섯-개)에 있습니다.
 
 **작업자는 권한 확인을 끄고 뜹니다.** `worker start` 는 Claude 작업자를 `--dangerously-skip-permissions` 로, Codex 작업자를 `--dangerously-bypass-approvals-and-sandbox` 로 띄웁니다. 사람이 자는 동안 작업자가 권한 질문에서 멈추지 않게 하려는 것입니다. 그 대신 작업자는 레포 안에서 묻지 않고 파일을 고치고 명령을 돌립니다. 시험 잠금과 마무리 검사 훅은 권한 확인과 상관없이 걸립니다. 믿을 수 있는 레포에서만 쓰세요.
 
 ## 11. 한계와 알려진 문제
 
 - **Node 웹앱을 전제합니다.** 마무리 검사의 통과 수 읽기, 확인 틀의 `node --test`, 리허설 스크린샷 필수는 Node 와 웹 화면을 생각하고 만들었습니다. 다른 스택은 `checkCommand` 를 바꾸면 돌지만 진척(시험 통과 수) 읽기는 Node 출력만 압니다. 시험 잠금은 `tests/` 밖의 `test_*.py` 를 시험 파일로 알아보지 못합니다.
-- **시험 잠금은 최선의 노력입니다.** 셸 명령을 훑어 막으므로 `node -e "…writeFileSync…"` 처럼 프로그램 안에서 쓰면 지나갑니다.
+- **시험 잠금은 최선의 노력입니다.** 셸 명령을 훑어 막으므로 `node -e "…writeFileSync…"` 나 PowerShell 의 `[IO.File]::WriteAllText(…)` 처럼 프로그램 안에서 쓰거나, 변수로 만든 경로를 쓰면 지나갑니다.
 - **계획 밖 결정 수는 근사값입니다.** 마일스톤을 시작할 때의 "결정과 시험" 번호와 닫을 때의 번호를 견줘 새 번호 수를 셉니다. 이번 마일스톤과 상관없는 뒤 마일스톤의 번호를 미리 더해도 이번 수로 셉니다. 시작 기록이 없는 마일스톤(이 기능 전에 시작한 것)은 세지 않습니다.
 - **가정 시험의 "통과(작은 예제 범위까지만)"도 시작을 허락합니다.** 진짜 자료가 없을 때의 통과라는 표시일 뿐, 실제 자료에서 다시 확인하는 관문은 없습니다.
-- **step 표가 아예 없으면 `advance check` 가 막지 않습니다.** 머리줄만 있는 빈 표는 막지만, 파일이 없을 때는 보지 않습니다.
+- **step 표가 아예 없으면 `advance check` 가 막지 않습니다.** 머리줄만 있는 빈 표는 막지만, 파일이 없을 때는 보지 않습니다(닫을 때는 막힙니다).
+- **관문이 보지 않는 안내가 있습니다.** 기획서의 `승인:` 줄이 없어도 `advance decide` 는 넘어갑니다. `step-done` 은 커밋 관문 기록(`commit_gate`)이나 커밋 여부를 보지 않습니다. 리뷰 작업자가 쓰는 `.rail/review/<step>.json` 을 읽는 코드가 없습니다. 이것들은 리더가 "다음 할 일"과 스킬을 따라 지킵니다. 무엇을 코드가 막고 무엇을 리더가 지키는지는 [HOW-IT-WORKS 3절](HOW-IT-WORKS.md#3-판정은-누가-하나)의 표에 있습니다.
 - **`isolation: worktree` 에서는 새 worktree 폴더마다 Claude Code 가 "이 폴더를 믿습니까?"를 물을 수 있습니다.** 기본 선택이 "No, exit" 라서, 사람이 없으면 작업자가 뜨자마자 끝날 수 있습니다. 믿은 레포의 worktree 도 묻는지는 확인하지 못했습니다. `shared` 방식(기본)은 리더와 같은 폴더라 묻지 않습니다.
 - **리더가 Orca 오케스트레이션의 작업자로 떠 있으면 `worker start` 가 일을 맡기지 못합니다.** Orca 가 작업자 안에서 `--terminal` 로 일을 맡기는 것을 막기 때문입니다. 리더는 사람이 연 Orca 창에서 띄우세요.
 - **Windows 에서 직접 돌려 보지 못했습니다.** 작업자 명령은 Windows 면 PowerShell 문법(`$env:RAIL_ALLOW_TEST_EDIT='1'; claude …`, `cd '…'; …`)으로 씁니다. Orca 의 Windows 터미널 셸이 cmd.exe 이면 이 문법이 맞지 않습니다. 레일 시험은 CI 의 windows-latest 에서 돌지만, 실제 Orca 창에 작업자를 띄우는 부분과 Claude Code 의 Windows 훅 실행은 CI 로 확인할 수 없습니다.
-- **Orca 없이 쓰면** 기획과 상태 명령은 되지만, 작업자 띄우기·닫기와 리더 깨우기는 손으로 해야 합니다(하위 에이전트에 명세를 주고 `log worker_start` 로 남기라고 `status` 가 안내합니다).
+- **Orca 없이 쓰면** 기획과 상태 명령은 되지만, 작업자 띄우기·닫기와 리더 깨우기는 손으로 해야 합니다(하위 에이전트에 명세를 주고 `log worker_start` 로 남기라고 `status` 가 안내합니다. 이때 `log` 는 "손으로 쓰지 마세요" 경고를 내지만 기록은 남깁니다).
 
 ## 12. 문제 해결
 
@@ -332,7 +342,7 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
 | 자리 | 하는 일 |
 |---|---|
 | `scripts/rail.mjs` | 명령을 받아 넘기는 입구 |
-| `scripts/lib/*.mjs` | 하는 일 하나씩: 상태·잠금·기록(`state.mjs`), 관문(`gates.mjs`), 위치와 다음 할 일 문구(`status.mjs`), 기획서 읽기와 착수 전 판정(`docs.mjs`), 작업자(`workers.mjs`), 자율 모드(`autonomy.mjs`, `budget.mjs`), 미리 승인과 판정 대기(`queue.mjs`), 기능 확인(`check.mjs`), 장면·리허설(`scene.mjs`), 부품 쓰임(`usage.mjs`, `parts.mjs`), 시제품(`proto.mjs`), 낡은 시험 판정(`stale.mjs`), worktree(`worktree.mjs`), Orca 부르기(`orca.mjs`). 파일마다 맨 위 한 줄이 그 일입니다 |
+| `scripts/lib/*.mjs` | 하는 일 하나씩(상태와 기록, 관문, 위치와 다음 할 일 문구, 작업자, 자율 모드 등). 파일마다 맨 위 한 줄이 그 일이고, 한 줄 설명·줄 수·쓰는 명령은 [HOW-IT-WORKS 4절](HOW-IT-WORKS.md#4-모듈-지도)의 표에 있습니다 |
 | `scripts/install.mjs` | 설치·업데이트 도구. `npm link` 하면 `rail-install` 명령이 됨(제품 레포에는 깔리지 않음) |
 | `hooks/*.mjs` | 훅. 설치하면 `.rail/hooks/` 로 갑니다 |
 | `skills/rail*/` | 스킬. 설치하면 `.claude/skills/` 로 갑니다 |
@@ -340,6 +350,7 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
 | `examples/tiny/` | 아주 작은 예제 프로젝트 |
 | `tests/` | 레일 시험 |
 | `reports/` | 작업 보고서 |
+| `HOW-IT-WORKS.md` | 레일의 속: 흐름, 판정, 모듈 지도, 상태와 기록, 훅, 자율 모드, 설치, OS 차이, 크기 |
 
 시험 돌리기:
 
