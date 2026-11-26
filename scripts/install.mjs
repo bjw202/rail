@@ -5,6 +5,9 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadState, readEvents } from './lib/state.mjs'
+import { openWorkers } from './lib/workers.mjs'
+import { dirty as uncommitted } from './lib/worktree.mjs'
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 // exec 형식(args 가 있으면 셸을 거치지 않음): Windows 에서 훅이 Git Bash 로 돌든 PowerShell 로 돌든 경로 자리표시자가 한 인자로 그대로 간다.
@@ -62,7 +65,21 @@ export function mergeSettings(s) {
   return out
 }
 
-export function install(target) {
+// 이미 레일을 쓰는 레포에서 일이 진행 중인가: 커밋 안 된 변경(레일 기록 빼고), 열린 작업자. 레일의 판정 함수를 그대로 부른다. 막을 까닭 글, 없으면 null.
+function busy(T) {
+  const files = uncommitted(T, true)
+  if (files.length) return `커밋 안 된 변경이 ${files.length}개 있습니다:\n${files.slice(0, 5).map((f) => `  ${f}`).join('\n')}${files.length > 5 ? `\n  … 외 ${files.length - 5}개` : ''}\n먼저 커밋하거나 치운 뒤 다시 치세요.`
+  let st = { closed: [] }
+  try {
+    st = loadState(path.join(T, '.rail/state.json'))
+  } catch {}
+  const n = openWorkers(st, readEvents(path.join(T, '.rail/log.jsonl'))).length
+  return n ? `작업자 ${n}명이 도는 중입니다. 끝난 뒤 다시 치세요.` : null
+}
+export const COMMIT_HINT = '레일 업데이트는 따로 커밋하세요: git add .rail .claude docs/RAIL.md .gitignore 를 한 뒤 git commit -m "rail 업데이트"'
+
+// force: 진행 중 검사(busy)를 건너뛴다. 사람이 알고 밀어붙일 때만.
+export function install(target, { force = false } = {}) {
   const T = path.resolve(target)
   if (!fs.existsSync(T) || !fs.statSync(T).isDirectory()) throw new Error(`대상 폴더가 없습니다: ${T}`)
   if (real(T) === real(SRC)) throw new Error(`여기는 레일 원본 폴더입니다(${T}). 레일을 깔 제품 레포 폴더로 가서 다시 치세요.`)
@@ -71,6 +88,19 @@ export function install(target) {
     while (!fs.existsSync(path.join(top, '.git')) && path.dirname(top) !== top) top = path.dirname(top)
     throw new Error(fs.existsSync(path.join(top, '.git')) ? `${T} 는 git 레포의 하위 폴더입니다. 레포 맨 위 폴더(${top})에서 다시 치세요.` : `${T} 는 git 레포가 아닙니다. 제품 레포 폴더에서 치거나, 먼저 git init 하세요.`)
   }
+  // 아무것도 쓰기 전에 settings.json 을 읽고 합쳐 본다. 깨졌으면 반쯤 깔린 레포를 남기지 않고 멈춘다.
+  const sf = path.join(T, '.claude/settings.json')
+  let settings
+  try {
+    const s = fs.existsSync(sf) ? JSON.parse(fs.readFileSync(sf, 'utf8').replace(/^\uFEFF/, '')) : {}
+    if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('맨 바깥이 { } 객체가 아닙니다')
+    settings = mergeSettings(s)
+  } catch (e) {
+    throw new Error(`settings.json 을 읽지 못했습니다: ${e.message}. 고친 뒤 다시 치세요. (${sf})`)
+  }
+  const used = ['.rail/installed.json', '.rail/state.json'].some((f) => fs.existsSync(path.join(T, f)))
+  const why = used && !force && busy(T)
+  if (why) throw new Error(`${T} 에서 레일 일이 진행 중이라 업데이트하지 않았습니다. ${why}\n알고도 밀어붙이려면 --force 를 붙이세요.`)
   const changed = []
   const write = (rel, body) => {
     const f = path.join(T, rel)
@@ -94,8 +124,7 @@ export function install(target) {
   const have = fs.existsSync(gi) ? fs.readFileSync(gi, 'utf8').replace(/\r\n/g, '\n') : ''
   const add = fs.readFileSync(path.join(SRC, 'templates/.gitignore'), 'utf8').replace(/\r\n/g, '\n').split('\n').filter((l) => l.trim() && !have.split('\n').includes(l))
   if (add.length) write('.gitignore', `${have}${have && !have.endsWith('\n') ? '\n' : ''}${add.join('\n')}\n`)
-  const sf = path.join(T, '.claude/settings.json')
-  write('.claude/settings.json', JSON.stringify(mergeSettings(fs.existsSync(sf) ? JSON.parse(fs.readFileSync(sf, 'utf8')) : {}), null, 2) + '\n')
+  write('.claude/settings.json', JSON.stringify(settings, null, 2) + '\n')
   const git = (...a) => spawnSync('git', a, { cwd: SRC, encoding: 'utf8' })
   const commit = git('rev-parse', '--short', 'HEAD').stdout?.trim() || null
   const dirty = commit ? Boolean(git('status', '--porcelain').stdout?.trim()) : null
@@ -106,9 +135,11 @@ export function install(target) {
 // 직접 실행됐나: npm link 의 심볼릭 링크나 Windows .cmd 껍데기로 부르면 argv[1] 이 링크 경로라, 양쪽을 실제 경로로 풀어(real) 비교한다.
 if (process.argv[1] && real(process.argv[1]) === real(fileURLToPath(import.meta.url))) {
   try {
-    const r = install(process.argv[2] ?? process.cwd())
+    const args = process.argv.slice(2)
+    const r = install(args.find((a) => a !== '--force') ?? process.cwd(), { force: args.includes('--force') })
     process.stdout.write(`[레일 설치] ${r.target} — 레일 ${r.commit ?? '(커밋 모름)'}${r.dirty ? ' (커밋 안 된 변경 있음)' : ''}\n${r.changed.length ? r.changed.map((c) => `  ${c}`).join('\n') : '  바뀐 파일 없음'}\n`)
     if (process.platform === 'win32' && !hasGitBash()) process.stdout.write(GIT_BASH_WARNING)
+    if (r.changed.length) process.stdout.write(`${COMMIT_HINT}\n`)
   } catch (e) {
     process.stderr.write(`[레일 설치 실패] ${e.message}\n`)
     process.exit(1)

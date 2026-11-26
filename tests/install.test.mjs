@@ -5,14 +5,14 @@ import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
-import { GIT_BASH_WARNING, hasGitBash } from '../scripts/install.mjs'
+import { COMMIT_HINT, GIT_BASH_WARNING, hasGitBash } from '../scripts/install.mjs'
 import { denied, git, put, tmp } from './helpers.mjs'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const INSTALL = path.join(ROOT, 'scripts/install.mjs')
 // 대상을 주면 인자로, 안 주면(undefined) cwd 에서 인자 없이 부른다. file 로 다른 경로(링크)의 install.mjs 를 부를 수 있다.
-const install = (target, { cwd, file = INSTALL } = {}) => {
-  const r = spawnSync(process.execPath, [file, ...(target === undefined ? [] : [target])], { cwd, encoding: 'utf8' })
+const install = (target, { cwd, file = INSTALL, flags = [] } = {}) => {
+  const r = spawnSync(process.execPath, [file, ...(target === undefined ? [] : [target]), ...flags], { cwd, encoding: 'utf8' })
   return { code: r.status, out: r.stdout, err: r.stderr }
 }
 const read = (root, rel) => readFileSync(path.join(root, rel), 'utf8')
@@ -30,6 +30,7 @@ function repo() {
   put(root, '.claude/settings.json', JSON.stringify({ env: { A: '1' }, permissions: { allow: ['Bash(npm test)'] }, hooks: { Stop: [{ hooks: [{ type: 'command', command: 'echo 내 훅' }] }] } }))
   return root
 }
+const commitAll = (root) => (git(root, 'add', '-A'), git(root, 'commit', '-q', '-m', 'rail'))
 
 describe('설치', () => {
   test('레일 파일·스킬·시작 틀을 깔고, settings.json 에 레일 훅과 명령 허용만 더한다', () => {
@@ -59,11 +60,13 @@ describe('설치', () => {
 
   test('두 번 돌려도 훅·허용·.gitignore 줄이 두 번 들어가지 않고 "바뀐 파일 없음"이다', () => {
     const root = repo()
-    install(root)
+    assert.ok(install(root).out.trimEnd().endsWith(COMMIT_HINT), '바뀐 것이 있으면 마지막 줄에 따로 커밋하라는 안내')
+    commitAll(root)
     const first = read(root, '.claude/settings.json')
     const again = install(root)
     assert.equal(again.code, 0, again.err)
     assert.match(again.out, /바뀐 파일 없음/)
+    assert.ok(!again.out.includes(COMMIT_HINT), '바뀐 것이 없으면 커밋 안내도 없다')
     assert.equal(read(root, '.claude/settings.json'), first)
     assert.equal(railCommands(settings(root)).length, 5)
     assert.equal(read(root, '.gitignore').split('\n').filter((l) => l === '.rail/.lock').length, 1)
@@ -115,6 +118,7 @@ describe('설치', () => {
     const info = JSON.parse(read(root, '.rail/installed.json'))
     writeFileSync(path.join(root, '.rail/installed.json'), JSON.stringify({ ...info, files: [...info.files, '.rail/bin/lib/old.mjs'] }))
     put(root, '.rail/bin/lib/old.mjs', '// 지난 판에만 있던 파일\n')
+    commitAll(root)
     const r = install(root)
     assert.equal(r.code, 0, r.err)
     assert.match(r.out, /바꿈 \.rail\/bin\/lib\/core\.mjs/)
@@ -175,5 +179,60 @@ describe('설치', () => {
     assert.equal(r.code, 0, r.err)
     assert.match(r.out, /\[레일 설치\]/, '링크 경로로 불러도 "직접 실행" 으로 알아본다')
     assert.ok(existsSync(path.join(root, '.rail/bin/rail.mjs')))
+  })
+
+  test('settings.json 이 깨져 있으면(주석·끝 쉼표) 아무것도 쓰지 않고 까닭과 함께 멈춘다', () => {
+    const root = repo()
+    put(root, '.claude/settings.json', '{\n  // 내 설정\n  "env": { "A": "1" },\n}\n')
+    const before = read(root, '.gitignore')
+    const r = install(root)
+    assert.equal(r.code, 1)
+    assert.match(r.err, /settings\.json 을 읽지 못했습니다: .+\. 고친 뒤 다시 치세요/)
+    assert.ok(!existsSync(path.join(root, '.rail')), '레일 파일이 하나도 생기지 않는다')
+    assert.ok(!existsSync(path.join(root, 'docs/RAIL.md')))
+    assert.equal(read(root, '.gitignore'), before)
+    assert.equal(git(root, 'status', '--porcelain', '-uall', '--', '.claude/skills'), '')
+  })
+
+  test('레일을 쓰는 레포에 커밋 안 된 변경(레일 기록 빼고)이 있으면 무엇이 바뀌었는지 보이며 거절하고, --force 면 깐다', () => {
+    const root = repo()
+    install(root)
+    commitAll(root)
+    put(root, '.rail/state.json', '{"stage":"milestone"}')
+    put(root, '.rail/log.jsonl', '{}\n')
+    assert.equal(install(root).code, 0, '레일 기록만 바뀐 것은 막지 않는다')
+    put(root, 'src/app.mjs', '// 하던 일\n')
+    put(root, '.rail/bin/lib/core.mjs', '// 낡은 판\n')
+    const r = install(root)
+    assert.equal(r.code, 1)
+    assert.match(r.err, /커밋 안 된 변경이 2개 있습니다:\n {2}\.rail\/bin\/lib\/core\.mjs\n {2}src\/app\.mjs\n먼저 커밋하거나 치운 뒤 다시 치세요/)
+    assert.match(r.err, /--force/)
+    assert.equal(read(root, '.rail/bin/lib/core.mjs'), '// 낡은 판\n', '아무것도 덮지 않는다')
+    const f = install(root, { flags: ['--force'] })
+    assert.equal(f.code, 0, f.err)
+    assert.match(f.out, /바꿈 \.rail\/bin\/lib\/core\.mjs/)
+  })
+
+  test('작업자가 도는 중이면(열린 worker_start) 거절하고, --force 면 깐다. 닫힌 작업자는 막지 않는다', () => {
+    const root = repo()
+    install(root)
+    put(root, '.rail/state.json', JSON.stringify({ stage: 'milestone', milestone: 'M0', closed: [] }))
+    put(root, '.rail/log.jsonl', [{ event: 'worker_start', step: 'M0-1', milestone: 'M0' }, { event: 'worker_start', step: 'M0-2', milestone: 'M0' }].map((e) => JSON.stringify(e)).join('\n') + '\n')
+    commitAll(root)
+    const r = install(root)
+    assert.equal(r.code, 1)
+    assert.match(r.err, /작업자 2명이 도는 중입니다\. 끝난 뒤 다시 치세요/)
+    assert.equal(install(root, { flags: ['--force'] }).code, 0)
+    put(root, '.rail/log.jsonl', read(root, '.rail/log.jsonl') + [{ event: 'worker_closed', step: 'M0-1' }, { event: 'worker_closed', step: 'M0-2' }].map((e) => JSON.stringify(e)).join('\n') + '\n')
+    const ok = install(root)
+    assert.equal(ok.code, 0, ok.err)
+  })
+
+  test('처음 설치(레일 흔적 없음)는 커밋 안 된 변경이 있어도 검사 없이 깐다', () => {
+    const root = repo()
+    assert.notEqual(git(root, 'status', '--porcelain'), '', '시험 레포에는 커밋 안 된 파일이 있다')
+    const r = install(root)
+    assert.equal(r.code, 0, r.err)
+    assert.ok(existsSync(path.join(root, '.rail/installed.json')))
   })
 })

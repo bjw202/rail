@@ -3,8 +3,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { F, ROOT, fail, now, read } from './core.mjs'
 
-export function readEvents() {
-  const t = read(F.log)
+// file 을 주면 다른 레포의 기록을 읽는다(설치 도구가 대상 레포를 볼 때).
+export function readEvents(file = F.log) {
+  const t = read(file)
   if (!t) return []
   return t.split('\n').flatMap((l) => {
     try {
@@ -29,8 +30,8 @@ export function defaultState() {
     updated: null
   }
 }
-export function loadState() {
-  const raw = read(F.state)
+export function loadState(file = F.state) {
+  const raw = read(file)
   if (raw === null) return defaultState()
   const s = JSON.parse(raw)
   const d = defaultState()

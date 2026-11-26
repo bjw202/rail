@@ -174,6 +174,9 @@ cd C:\projects\my-app; rail-install
 - **바뀌는 것:** `.rail/bin/`, `.rail/hooks/`, `.claude/skills/rail*/` 의 레일 파일, `.claude/settings.json` 의 레일 훅 줄, `.rail/installed.json`. 지난 판에만 있던 레일 파일은 지웁니다(설치 목록에 있던 것만 지우므로 `.rail/bin/` 에 직접 둔 비용 명령 같은 파일은 남습니다).
 - **안 바뀌는 것:** `.rail/config.json`, 시작 틀, `docs/RAIL.md`, 상태와 기록, 기획서와 step 표.
 - 다시 돌렸는데 바뀐 것이 없으면 "바뀐 파일 없음"이 나옵니다. 두 번 돌려도 훅이 두 번 들어가지 않습니다.
+- 이미 레일을 쓰는 레포에 커밋 안 된 변경(레일 기록 `.rail/state.json`·`.rail/log.jsonl` 과 step 표는 빼고)이 있거나 작업자가 도는 중이면, 업데이트하지 않고 까닭을 보여 줍니다. 먼저 커밋하거나 작업자가 끝나기를 기다린 뒤 다시 칩니다. 그 상태를 알고도 꼭 지금 바꿔야 할 때만(예: 레일 고장 때문에 작업자를 닫을 수 없을 때) `rail-install --force` 를 씁니다.
+- `.claude/settings.json` 이 깨져 있으면(주석, 끝 쉼표 등) 아무 파일도 쓰지 않고 멈춥니다. 고친 뒤 다시 칩니다.
+- 바뀐 파일이 있으면 마지막 줄에 따로 커밋하라는 안내가 나옵니다: `git add .rail .claude docs/RAIL.md .gitignore` 를 한 뒤 `git commit -m "rail 업데이트"`. 제품 작업과 섞지 않으면 나중에 무엇이 레일 때문에 바뀌었는지 가려 보기 쉽습니다.
 - 시작 틀이나 `docs/RAIL.md` 를 새 판으로 바꾸고 싶으면 그 파일을 지운 뒤 설치를 다시 돌립니다.
 
 ## 7. 명령
@@ -185,7 +188,7 @@ cd C:\projects\my-app; rail-install
 | `/rail` | 거의 모든 순간. "다음 뭐 해?", "어디까지 했지?"도 됩니다 |
 | `node .rail/bin/rail.mjs status` | 터미널에서 위치 세 줄만 보고 싶을 때 |
 | `node .rail/bin/rail.mjs usage` | 부품마다 마일스톤별로 몇 번 일하고 막았는지 볼 때 |
-| `rail-install` (제품 레포 폴더에서), 또는 `node <원본>/scripts/install.mjs <레포>` | 설치와 업데이트 |
+| `rail-install` (제품 레포 폴더에서), 또는 `node <원본>/scripts/install.mjs <레포>` | 설치와 업데이트. 일이 진행 중인데도 밀어붙일 때만 `--force` |
 
 정책 바꾸기(`policy set …`, `plan approve …`)는 사람이 리더 세션에 말하면 리더가 사람 말을 `--said` 에 그대로 넣어 부릅니다. 사람이 직접 칠 일은 거의 없습니다.
 

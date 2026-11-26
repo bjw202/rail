@@ -21,8 +21,8 @@ function g(cwd, ...args) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
   return { ok: r.status === 0, out: r.stdout ?? '', err: lastLines(r.stderr || r.stdout, 3).join(' / ') }
 }
-// 커밋 안 된 변경(레일 기록과 step 표 빼고: step-start·step-done 이 리더 폴더의 표 상태 칸을 바로 쓴다). withNew 면 새 파일도 센다(worktree 를 지우면 사라지므로).
-const dirty = (cwd, withNew) =>
+// 커밋 안 된 변경(레일 기록과 step 표 빼고: step-start·step-done 이 리더 폴더의 표 상태 칸을 바로 쓴다). withNew 면 새 파일도 센다(worktree 를 지우면 사라지므로). 설치 도구도 쓴다.
+export const dirty = (cwd, withNew) =>
   g(cwd, 'status', '--porcelain', withNew ? '-uall' : '-uno', '--', '.', ...[...RECORDS, 'docs/plan'].map((f) => `:(exclude)${f}`)).out.split('\n').filter(Boolean).map((l) => l.slice(3))
 
 // 레일 이름 규칙의 브랜치와 그 worktree. 폴더가 사라진 기록은 먼저 치운다(prune).
