@@ -76,7 +76,7 @@ function busy(T) {
   const n = openWorkers(st, readEvents(path.join(T, '.rail/log.jsonl'))).length
   return n ? `작업자 ${n}명이 도는 중입니다. 끝난 뒤 다시 치세요.` : null
 }
-export const COMMIT_HINT = '레일 업데이트는 따로 커밋하세요: git add .rail .claude docs/RAIL.md .gitignore 를 한 뒤 git commit -m "rail 업데이트"'
+export const COMMIT_HINT = '레일 업데이트는 따로 커밋하세요: git add .rail .claude docs/RAIL.md CLAUDE.md .gitignore 를 한 뒤 git commit -m "rail 업데이트"'
 
 // force: 진행 중 검사(busy)를 건너뛴다. 사람이 알고 밀어붙일 때만.
 export function install(target, { force = false } = {}) {

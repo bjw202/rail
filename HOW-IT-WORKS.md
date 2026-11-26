@@ -141,6 +141,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 리허설 통과를 사람의 판정으로 기록하지 않음 | 스킬 문장입니다 | `skills/rail-check/SKILL.md` |
 | 커밋 정책과 자율 모드는 사람이 이 세션에서 직접 말했을 때만 바꿈 | 코드는 이 둘에 `--said` 를 요구하지 않습니다(`isolation`·부품 끄기·미리 승인만 요구) | `skills/rail/SKILL.md`, `policy.mjs` |
 | 작업자를 버리는 `worker done --force` 는 사람이 정했을 때만 | 스킬 문장입니다 | `skills/rail-milestone/workers.md` |
+| 기획서를 승인받으면 `CLAUDE.md` 의 빈칸(제품 한 줄, 명령, 되돌리기 어려운 일)을 채움 | 스킬 문장입니다. 코드는 빈칸이 남았는지 보지 않습니다 | `skills/rail-plan/SKILL.md` |
 
 ### 사람이 정하는 것
 
@@ -331,6 +332,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `.rail/reference/Mx/` | 고른 시제품 화면(기준 화면, git 에 넣음) | `proto.mjs:protoPick` |
 | `.rail/trial/T-xx/` | 가정 시험 지시서와 버리는 코드(git 에 넣지 않음) | 리더 |
 | `docs/PLAN.md`, `docs/plan/Mx.md`, `docs/decisions/D-xx-*.md`, `docs/plan/refs/` | 기획서, step 표, 시제품 카드, 참고 서랍 | 리더(상태 칸과 지도 줄 끝 ✅ 는 스크립트) |
+| `CLAUDE.md` | 모든 세션이 처음 읽는 짧은 개발 메모(제품 한 줄, 레일 문서 자리, 명령, 비밀 키, 되돌리기 어려운 일, 배운 규칙). 없을 때만 설치가 틀(`templates/CLAUDE.md`)로 만들고, 레일 코드는 읽지 않습니다 | 리더(빈칸은 기획서 승인 뒤, 배운 규칙은 사람이 승인한 뒤) |
 
 ### 환경 변수
 
@@ -399,14 +401,14 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 2. **settings.json 먼저 읽기.** 아무것도 쓰기 전에 `.claude/settings.json` 을 읽어(맨 앞 BOM 은 걷음) 합쳐 봅니다. JSON 이 아니거나 맨 바깥이 객체가 아니면 아무 파일도 쓰지 않고 멈춥니다.
 3. **진행 중 검사.** 이미 레일을 쓰는 레포(`.rail/installed.json` 또는 `.rail/state.json` 이 있음)면, 커밋 안 된 변경(새 파일 포함, `.rail/state.json`·`.rail/log.jsonl`·`.rail/test-baseline.json`·`docs/plan/` 은 뺌)이 있거나 열린 작업자가 있으면 멈춥니다. 레일의 판정 함수(`worktree.mjs:dirty`, `workers.mjs:openWorkers`)를 그대로 씁니다. `--force` 면 이 검사만 건너뜁니다.
 4. **레일 파일 쓰기.** `scripts/` 의 파일(설치 도구 빼고)을 `.rail/bin/` 으로, `hooks/*.mjs` 를 `.rail/hooks/` 로, `skills/` 를 `.claude/skills/` 로 늘 새로 씁니다. 내용이 같으면 쓰지 않습니다.
-5. **시작 틀.** `templates/` 의 파일(`.gitignore` 빼고: `.rail/config.json`, 틀 다섯 개, `docs/RAIL.md`)은 대상에 없을 때만 만듭니다.
+5. **시작 틀.** `templates/` 의 파일(`.gitignore` 빼고: `.rail/config.json`, 틀 다섯 개, `docs/RAIL.md`, `CLAUDE.md`)은 대상에 없을 때만 만듭니다. 그래서 이미 `CLAUDE.md` 가 있는 레포는 처음 설치 때도 그 파일을 건드리지 않습니다.
 6. **옛 파일 지우기.** 지난 `installed.json` 의 파일 목록에 있었는데 이번 레일에 없는 파일만 지웁니다.
 7. **.gitignore.** 틀의 줄 가운데 없는 줄만 끝에 더합니다.
 8. **settings.json 합치기.** 레일 훅(명령이나 인자에 `.rail/bin/` 또는 `.rail/hooks/` 가 든 훅, 옛 셸 문자열 꼴도 알아봄)만 빼고 다섯 개를 다시 넣습니다. 다른 훅과 설정은 그대로 둡니다. 허용 네 줄은 없는 것만 더합니다(`mergeSettings`).
 9. **installed.json.** 무엇이 바뀌었거나 원본 커밋·변경 여부가 달라졌으면 새로 씁니다.
 10. **출력.** 바뀐 파일을 한 줄씩("새로", "바꿈", "지움") 보이고, Windows 에서 Git Bash 를 못 찾으면 경고를, 바뀐 것이 있으면 따로 커밋하라는 안내를 냅니다.
 
-상태·기록·기획서(`.rail/state.json`, `.rail/log.jsonl`, `docs/PLAN.md`, `docs/plan/`)는 쓰는 목록에 없으므로 건드리지 않습니다. `npm link` 로 만든 `rail-install` 은 심볼릭 링크(맥)나 `.cmd` 껍데기(Windows)로 불리므로, "직접 실행됐나"를 양쪽 경로를 실제 경로로 풀어 비교합니다.
+상태·기록·기획서(`.rail/state.json`, `.rail/log.jsonl`, `docs/PLAN.md`, `docs/plan/`)는 쓰는 목록에 없으므로 건드리지 않습니다. 따로 커밋하라는 안내의 `git add` 에는 처음 설치 때 생긴 `CLAUDE.md` 도 듭니다(커밋하지 않으면 새 파일이라 다음 업데이트의 진행 중 검사에 걸립니다). `npm link` 로 만든 `rail-install` 은 심볼릭 링크(맥)나 `.cmd` 껍데기(Windows)로 불리므로, "직접 실행됐나"를 양쪽 경로를 실제 경로로 풀어 비교합니다.
 
 ## 9. 맥과 Windows 차이
 
@@ -427,19 +429,19 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 ## 10. 크기
 
-이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-26, 커밋 관문 기록을 뺀 덜어내기 뒤).
+이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-26, `CLAUDE.md` 시작 틀을 더한 뒤).
 
 | 묶음 | 파일 | 줄 |
 |---|---|---|
 | 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,898 (입구 69, 모듈 2,829) |
 | 레일 실행 코드: 훅 | `hooks/*.mjs` 4개 | 508 |
-| 레일 실행 코드 합 | | **3,406** (덜어내기 전 3,409) |
+| 레일 실행 코드 합 | | **3,406** (`CLAUDE.md` 틀을 더하며 늘지 않음) |
 | 설치 도구 | `scripts/install.mjs` | 147 |
-| 스킬 | `skills/*/*.md` 5개 | 140 |
-| 시작 틀 | `templates/` 8개(`docs/RAIL.md` 38줄 포함) | 221 |
-| 시험 | `tests/*.mjs` 23개(시험 파일 22개와 도우미) | 4,264 |
+| 스킬 | `skills/*/*.md` 5개 | 138 |
+| 시작 틀 | `templates/` 9개(`docs/RAIL.md` 38줄, `CLAUDE.md` 11줄 포함) | 232 |
+| 시험 | `tests/*.mjs` 23개(시험 파일 22개와 도우미) | 4,299 |
 
-시험 수는 265개이고, 맥에서 `npm test` 를 돌리면 264개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
+시험 수는 267개이고, 맥에서 `npm test` 를 돌리면 266개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
 
 ## 11. 코드가 보지 않는 것
 

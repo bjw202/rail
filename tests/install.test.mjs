@@ -128,6 +128,41 @@ describe('설치', () => {
     for (const [f, body] of [['.rail/state.json', '{"stage":"milestone"}'], ['docs/PLAN.md', '# 내 기획서\n'], ['.rail/config.json', '{"checkCommand":"npm test"}'], ['docs/RAIL.md', '내가 고친 설명서\n']]) assert.equal(read(root, f), body, f)
   })
 
+  test('CLAUDE.md 는 없으면 15줄 안쪽 틀로 만들고, 안내대로 커밋하면 다시 설치해도 막히지 않으며, 채운 뒤에도 바꾸지 않는다', () => {
+    const root = repo()
+    commitAll(root)
+    const r = install(root)
+    assert.equal(r.code, 0, r.err)
+    assert.match(r.out, /새로 CLAUDE\.md/)
+    const body = read(root, 'CLAUDE.md')
+    assert.equal(body, readFileSync(path.join(ROOT, 'templates/CLAUDE.md'), 'utf8'))
+    assert.ok(body.trimEnd().split('\n').length <= 15, '모든 세션에 통째로 들어가므로 짧게')
+    for (const s of ['docs/PLAN.md', 'docs/plan/', 'docs/RAIL.md', 'checkCommand', '.env', '되돌리기 어려운 일', '배운 규칙']) assert.ok(body.includes(s), s)
+    assert.ok(!/(^|\s)@[\w.~/]/m.test(body), '@ 로 다른 파일을 끌어오지 않는다')
+    // 안내의 git add 목록만 커밋해도 새 CLAUDE.md 가 남지 않아 다음 업데이트의 진행 중 검사에 걸리지 않는다.
+    git(root, 'add', ...COMMIT_HINT.match(/git add (.+?) 를/)[1].split(' '))
+    git(root, 'commit', '-q', '-m', 'rail')
+    assert.equal(git(root, 'status', '--porcelain').trim(), '')
+    const again = install(root)
+    assert.equal(again.code, 0, again.err)
+    assert.match(again.out, /바뀐 파일 없음/)
+    put(root, 'CLAUDE.md', '# 내 앱 — 개발 메모\n- 무엇: 채운 한 줄\n')
+    commitAll(root)
+    const third = install(root)
+    assert.equal(third.code, 0, third.err)
+    assert.ok(!/(새로|바꿈) CLAUDE\.md/.test(third.out), third.out)
+    assert.equal(read(root, 'CLAUDE.md'), '# 내 앱 — 개발 메모\n- 무엇: 채운 한 줄\n')
+  })
+
+  test('이미 CLAUDE.md 가 있는 레포는 처음 설치 때도 건드리지 않는다', () => {
+    const root = repo()
+    put(root, 'CLAUDE.md', '# 원래 있던 메모\r\n- 규칙 하나\r\n')
+    const r = install(root)
+    assert.equal(r.code, 0, r.err)
+    assert.ok(!/(새로|바꿈) CLAUDE\.md/.test(r.out), r.out)
+    assert.equal(readFileSync(path.join(root, 'CLAUDE.md'), 'utf8'), '# 원래 있던 메모\r\n- 규칙 하나\r\n')
+  })
+
   test('설치된 레포에서는 RAIL_ROOT 없이 .rail/bin/rail.mjs 가 그 레포를 쓰고, .rail/hooks 의 시험 잠금이 막고 기록한다', () => {
     const root = repo()
     install(root)

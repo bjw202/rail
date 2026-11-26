@@ -29,7 +29,7 @@
 `.rail/config.json` 의 `autonomy.mode` 가 `on` 이고 커밋 정책이 `auto-local` 이면, 리더는 턴마다 `next` 를 불러 멈춤 규칙(done, human, busy, same_failure, budget, off)을 봅니다. Orca 자동화는 `next --precheck` 의 종료 코드(할 일 있음 0, done 10, human 11, budget 12, same_failure 13, busy 14, error 15, off 16)를 보고 리더를 깨웁니다. 예산 규칙은 `autonomy.budget.costCommand` 가 비용을 잴 때만 쓰고, 비어 있으면 `status` 에 경고 한 줄만 냅니다.
 
 ## 파일
-`docs/PLAN.md`(기획서, 틀은 `.rail/plan/template.md`), `docs/plan/refs/`(참고 서랍), `docs/plan/Mx.md`(지금 마일스톤의 step 표), `docs/decisions/D-xx.md`(시제품 카드), `.rail/trial/`(가정 시험 틀과 버리는 코드), `.rail/state.json`(위치), `.rail/config.json`(검사 명령, 커밋 정책, 자율 모드와 예산, 보험 부품과 꺼 둔 부품), `.rail/test-baseline.json`(잠긴 시험 파일 목록), `.rail/review/`, `.rail/rehearsal/Mx/`(리허설 결과와 스크린샷), `.rail/check/`(확인 지시서 틀과 결과), `.rail/stale/`(낡은 시험 판정), `.rail/proto/`(시제품), `.rail/reference/Mx/`(기준 화면), `.rail/log.jsonl`(사건 기록 — 레일의 효과를 재는 자료).
+`CLAUDE.md`(모든 세션이 처음 읽는 짧은 개발 메모, 기획서 승인 뒤 빈칸을 채우고 사람이 승인한 배운 규칙을 쌓음), `docs/PLAN.md`(기획서, 틀은 `.rail/plan/template.md`), `docs/plan/refs/`(참고 서랍), `docs/plan/Mx.md`(지금 마일스톤의 step 표), `docs/decisions/D-xx.md`(시제품 카드), `.rail/trial/`(가정 시험 틀과 버리는 코드), `.rail/state.json`(위치), `.rail/config.json`(검사 명령, 커밋 정책, 자율 모드와 예산, 보험 부품과 꺼 둔 부품), `.rail/test-baseline.json`(잠긴 시험 파일 목록), `.rail/review/`, `.rail/rehearsal/Mx/`(리허설 결과와 스크린샷), `.rail/check/`(확인 지시서 틀과 결과), `.rail/stale/`(낡은 시험 판정), `.rail/proto/`(시제품), `.rail/reference/Mx/`(기준 화면), `.rail/log.jsonl`(사건 기록 — 레일의 효과를 재는 자료).
 
 ## 훅
 세션을 열 때 위치 세 줄 보여 주기, 이미 있는 시험 파일과 `fixtures/` 고치기 막기(우회는 `RAIL_ALLOW_TEST_EDIT=1` 을 붙여 Claude 를 띄우기), 멈추기 전 마무리 검사(`checkCommand` 가 비면 건너뜀), 압축 직전 요약 지시와 압축 직후 이어받기 안내.
