@@ -1,6 +1,0 @@
-{
-  "name": "rail",
-  "version": "2.9.0",
-  "description": "AI 코딩 작업을 브리프 → 로드맵 → 결정 카드 → 마일스톤 → 장면 확인의 레일로 끌고 가는 Claude Code 플러그인. 상태와 관문은 스크립트가 판정한다.",
-  "keywords": ["workflow", "milestone", "gate", "orca"]
-}

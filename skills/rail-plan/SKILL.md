@@ -2,7 +2,7 @@
 name: rail-plan
 description: 레일의 기획 단계. 보여 주고 반응 받는 인터뷰로 주인의 흐린 생각을 꺼내 기획서 docs/PLAN.md 한 장을 쓰고, 마일스톤마다 착수 전 결정과 가정 시험을 푼다. /rail 이 부른다.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *)
+allowed-tools: Bash(node .rail/bin/rail.mjs *)
 ---
 # rail-plan — 인터뷰, 기획서, 착수 전 결정과 시험
 

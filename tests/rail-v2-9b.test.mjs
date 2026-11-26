@@ -111,13 +111,6 @@ describe('지운 것', () => {
     assert.deepEqual(JSON.parse(run(r, ['status', '--json']).out).disabled, [], 'config 에 손으로 적어도 끄지 않는다')
   })
 
-  test('예전 표 검사가 붙잡은 기록은 마무리 검사의 막음으로 세지 않는다', () => {
-    const r = root({ stage: 'done', closed: ['M0'] })
-    const line = (event, data) => JSON.stringify({ t: '2026-11-24T00:00:00Z', event, stage: 'milestone', milestone: 'M0', ...data })
-    put(r, '.rail/log.jsonl', [line('gate_passed', { target: 'step-start' }), line('hook_held', { hook: 'stop-check', reason: '계획 표 검사(`node .rail/bin/rail.mjs validate`)' }), line('milestone_closed', {})].join('\n') + '\n')
-    const u = JSON.parse(run(r, ['usage', '--json']).out)
-    assert.equal(u.parts.find((p) => p.id === 'stop-check').by.M0.blocked, 0)
-  })
 })
 
 describe('남긴 것: 검증기는 장면 질문 앞에서 본다', () => {

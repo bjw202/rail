@@ -19,7 +19,7 @@ export const SETTLED = new Set(['succeeded', 'failed', 'cancelled', 'canceled', 
 // worker-show 결과가 끝난 일인가.
 export const isSettled = (show) => Boolean(show?.ok && (show.json?.result?.stage === 'settled' || SETTLED.has(show.json?.result?.state)))
 
-// 레일 기록에서는 열린 작업자가 Orca 쪽에서 이미 끝났는가(2.9판 깨우기 교착 막기).
+// 레일 기록에서는 열린 작업자가 Orca 쪽에서 이미 끝났는가(깨우기 교착 막기).
 // 끝났으면 { how } 를, 아직이거나 알 수 없으면(orca 가 없거나 실패) null 을 준다. null 이면 부르는 쪽은 지금처럼 busy 로 둔다.
 // 알림은 보통 곧바로 리더를 깨우므로, 띄운 지 ASK_AFTER_MIN 분이 지난 작업자만 묻는다(next 마다 orca 를 부르지 않게).
 export const ASK_AFTER_MIN = 5

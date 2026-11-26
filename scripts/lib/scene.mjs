@@ -1,14 +1,14 @@
 // 장면 질문과 답, 장면 확인, 장면 리허설, 되돌림.
 import fs from 'node:fs'
 import path from 'node:path'
-import { autonomyOn, railVersion } from './config.mjs'
+import { autonomyOn } from './config.mjs'
 import { F, fail, now, out, read, unquote } from './core.mjs'
 import { partOff, partSkipped } from './parts.mjs'
 import { staleList, staleText } from './stale.mjs'
 import { appendLog, loadState, readEvents, saveState } from './state.mjs'
 import { verifyStatus } from './verify.mjs'
 
-// ---------- 장면 질문과 답 (2.1판) ----------
+// ---------- 장면 질문과 답 ----------
 // 리허설이 본 실제 숫자 한 줄: 0번(오늘 빌드인가)이 아닌 첫 통과 항목, 없으면 본 것이 있는 첫 항목.
 export function sceneExample(st) {
   let list = []
@@ -50,7 +50,7 @@ export function answerScene(st, ask, text, waitSec) {
     const q = !verdict
       ? `됨인지 안 됨인지를 본 것과 함께 알려 주세요. 답 예: "됨. 본 것: ${seen || ex}"`
       : `${verdict === 'pass' ? '됨' : '안 됨'}으로 받았습니다. 화면에서 본 것 한 줄을 알려 주세요. 답 예: "본 것: ${ex}"`
-    st.human_ask = { q, kind: 'scene', at: now(), milestone: st.milestone, rail: railVersion(), follow_up: true, ...(verdict ? { verdict } : {}), ...(seen ? { seen } : {}), ...(ask.stale ? { stale: ask.stale } : {}) }
+    st.human_ask = { q, kind: 'scene', at: now(), milestone: st.milestone, follow_up: true, ...(verdict ? { verdict } : {}), ...(seen ? { seen } : {}), ...(ask.stale ? { stale: ask.stale } : {}) }
     saveState(st)
     appendLog('human_ask', st, { q, kind: 'scene', follow_up: true })
     out(`[다시 묻기] 답에 ${!verdict ? '판정(됨/안 됨)' : '본 것'}이 없습니다. 사람에게 한 번만 더 물으세요:\n${q}`)
@@ -72,7 +72,7 @@ export function cmdScene({ pos, flags }) {
 }
 // stale: 장면 질문이 보인 판정 시험 목록의 건수. "됨"이면 그 목록도 승인한 것으로 남긴다(닫기 관문이 본다).
 export function recordScene(st, id, result, note, stale = 0) {
-  // 2.9판: 판정 대기 목록(닫힌 뒤 기다리는 것)이나 안 됨으로 판정된 닫힌 마일스톤은 지금 단계와 상관없이 받는다. 리허설·검증은 닫을 때 봤다.
+  // 판정 대기 목록(닫힌 뒤 기다리는 것)이나 안 됨으로 판정된 닫힌 마일스톤은 지금 단계와 상관없이 받는다. 리허설·검증은 닫을 때 봤다.
   const late = st.gates.scene_pending?.[id] ?? (st.closed.includes(id) && st.gates.scene_checked?.[id]?.result === 'fail' ? st.gates.scene_checked[id] : null)
   if (late) {
     // 대기 기록에 붙은 판정 시험 목록은 판정이 바뀌어도(안 됨 → 고친 뒤 됨) 따라간다. "됨"이면 목록도 승인으로 남긴다.
@@ -148,7 +148,7 @@ export function cmdRehearsalRecord({ pos }) {
   if (failed.length) out(selfFix(st).ok ? `사람에게 묻기 전에 스스로 고칩니다 (reopen --self-fix, ${selfFix(st).n + 1}/${SELF_FIX_MAX}).` : '사람에게는 실패 항목을 먼저 보여 줍니다.')
 }
 
-// 2.9판 스스로 고치기: 자율 모드에서 리허설 실패가 모두 기계로 가릴 수 있는 항목(judge 가 taste 가 아님)이면 마일스톤마다 2번까지 사람에게 묻기 전에 고친다.
+// 스스로 고치기: 자율 모드에서 리허설 실패가 모두 기계로 가릴 수 있는 항목(judge 가 taste 가 아님)이면 마일스톤마다 2번까지 사람에게 묻기 전에 고친다.
 export const SELF_FIX_MAX = 2
 export function selfFix(st) {
   const failed = st.gates.rehearsed?.[st.milestone]?.failed ?? []

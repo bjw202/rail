@@ -7,7 +7,7 @@ import { appendLog, loadState, readEvents } from './state.mjs'
 
 
 // 이 마일스톤의 마지막 step-done 뒤에 돈 verify 가 모든 검증기를 통과했는가. 장면 질문 앞(sceneProblems)과 status 의 "먼저 검증기" 안내가 본다.
-// 2.9판(덜어내기 둘째): 관문 check 는 이것을 보지 않는다. 검증기가 없으면 막지 않는다(예전 마일스톤과 호환).
+// 관문 check 는 이것을 보지 않는다. 검증기가 없으면 막지 않는다.
 export function verifyStatus(st, log = false) {
   if (partOff('verify')) {
     if (log) partSkipped('verify', st, { where: 'gate' })

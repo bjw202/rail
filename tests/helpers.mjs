@@ -6,10 +6,14 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 export const RAIL = path.resolve(HERE, '../scripts/rail.mjs')
+// 작업자 명령의 셸 문법은 플랫폼마다 다르다(workers.mjs agentCommand). 시험은 지금 플랫폼의 꼴을 기대한다.
+export const WIN = process.platform === 'win32'
+export const TEST_EDIT_ENV = WIN ? "$env:RAIL_ALLOW_TEST_EDIT='1'; " : 'RAIL_ALLOW_TEST_EDIT=1 '
+export const q = (s) => (WIN ? `'${s.replace(/'/g, "''")}'` : `'${s}'`)
 export const HOOKS = path.resolve(HERE, '../hooks')
 
 export function tmp(prefix = 'rail-') {
-  return realpathSync(mkdtempSync(path.join(tmpdir(), prefix)))
+  return realpathSync.native(mkdtempSync(path.join(tmpdir(), prefix)))
 }
 
 export function put(root, rel, text) {

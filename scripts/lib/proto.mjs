@@ -1,4 +1,4 @@
-// 시식용 시제품 (2.4판).
+// 시식용 시제품.
 import fs from 'node:fs'
 import path from 'node:path'
 import { loadConfig } from './config.mjs'
@@ -8,7 +8,7 @@ import { appendLog, loadState, readEvents, saveState, withLock } from './state.m
 import { orca } from './orca.mjs'
 import { findIn, openWorkers } from './workers.mjs'
 
-// ---------- 시식용 시제품 (2.4판) ----------
+// ---------- 시식용 시제품 ----------
 // 화면·배치·속도처럼 봐야 아는 결정은 카드에 "시제품: 예", "## 변주"(2~3개), "## 스크린샷"(찍을 화면)을 둔다.
 // 변주마다 새 작업 공간에 작업자를 띄워 버릴 시제품을 실제 데이터로 만들고, 기록이 다 모이면 카드에 표와 비교 페이지를 붙여 한 번 묻는다.
 export const PROTO_DIR = path.join(ROOT, '.rail/proto')
@@ -120,7 +120,7 @@ export function protoStart(id, flags) {
     }
     let worktree = findIn(ws.json, 'worktreePath', /^\//) ?? findIn(ws.json, 'path', /^\//)
     let branch = shortBranch(findIn(ws.json, 'branch', /\S/))
-    // 2.5판: 응답에 경로나 브랜치가 없으면 Orca 의 작업 공간 목록에서 이름으로 찾는다(정리에 쓴다). 그래도 없으면 null.
+    // 응답에 경로나 브랜치가 없으면 Orca 의 작업 공간 목록에서 이름으로 찾는다(정리에 쓴다). 그래도 없으면 null.
     if (!worktree || !branch) {
       const found = protoWorktree(name)
       worktree ??= found?.path ?? null
@@ -255,7 +255,7 @@ export function protoPick(id, picks, usage) {
   for (const w of openWorkers(st, ev).filter((x) => x.proto === id)) orca(['orchestration', 'worker-stop', '--dispatch', w.dispatch, '--json'], 60_000)
   const seen = new Set()
   for (const w of starts) {
-    // 2.5판: 기록에 경로나 브랜치가 없으면 지우기 전에 Orca 의 작업 공간 목록에서 이름으로 찾는다. 브랜치는 접두어(user/ 등)까지 실제 이름으로 쓴다.
+    // 기록에 경로나 브랜치가 없으면 지우기 전에 Orca 의 작업 공간 목록에서 이름으로 찾는다. 브랜치는 접두어(user/ 등)까지 실제 이름으로 쓴다.
     const found = (!w.worktree || !w.branch) && w.name ? protoWorktree(w.name) : null
     const where = w.worktree ?? found?.path ?? null
     const branch = shortBranch(w.branch) ?? found?.branch ?? protoLocalBranch(w.name)
@@ -278,7 +278,7 @@ export function protoPick(id, picks, usage) {
   out(`[시제품] ${id}: ${picks.join(', ')} 의 스크린샷 ${copied.length}장을 .rail/reference/${ms}/ 에 옮겼습니다(git 에 넣습니다). 장면 리허설이 이 화면과 비교합니다.`)
 }
 
-// 2.5판: Orca 의 작업 공간 목록에서 이름(표시 이름, 폴더 이름, 브랜치 끝 이름)으로 시제품 작업 공간을 찾는다. { path, branch } 또는 null.
+// Orca 의 작업 공간 목록에서 이름(표시 이름, 폴더 이름, 브랜치 끝 이름)으로 시제품 작업 공간을 찾는다. { path, branch } 또는 null.
 export const shortBranch = (b) => (typeof b === 'string' && b.trim() ? b.trim().replace(/^refs\/heads\//, '') : null)
 export function protoWorktree(name) {
   const r = orca(['worktree', 'list', '--json'], 60_000)

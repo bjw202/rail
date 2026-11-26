@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { DECIDED_PLAN, GOOD_PLAN, RAIL, events, put, state, tmp } from './helpers.mjs'
+import { DECIDED_PLAN, GOOD_PLAN, RAIL, TEST_EDIT_ENV, events, put, state, tmp } from './helpers.mjs'
 
 function cleanEnv(extra = {}) {
   const env = { ...process.env, ...extra }
@@ -140,7 +140,7 @@ const askAnswer = (root, env, q, a) => {
   ok(run(root, ['ask', q, '--kind', 'approve'], env))
   ok(run(root, ['answer', a], env))
 }
-const ENV = 'RAIL_ALLOW_TEST_EDIT=1 '
+const ENV = TEST_EDIT_ENV
 
 describe('사람이 허락한 시험 고치기 작업자', () => {
   test('step 이름을 넣은 질문에 허락하면 그 step 의 작업자 명령 앞에만 env 를 붙이고, 허락 한 번에 작업자 하나다', () => {

@@ -36,7 +36,7 @@ export function loadState() {
   const d = defaultState()
   return { ...d, ...s, gates: { ...d.gates, ...(s.gates ?? {}) }, interview: { ...d.interview, ...(s.interview ?? {}) } }
 }
-// 쓰기는 늘 잠금 안에서 한다(2.2판). 읽고-고치고-쓰는 명령은 명령 전체가 잠금을 잡는다(아래 LOCKED).
+// 쓰기는 늘 잠금 안에서 한다. 읽고-고치고-쓰는 명령은 명령 전체가 잠금을 잡는다(아래 LOCKED).
 export function saveState(s) {
   s.updated = now()
   withLock(() => {
@@ -53,7 +53,7 @@ export function appendLog(event, st, data = {}) {
   withLock(() => fs.appendFileSync(F.log, JSON.stringify(line) + '\n'))
 }
 
-// ---------- 파일 잠금 (2.2판) ----------
+// ---------- 파일 잠금 ----------
 // 상태 파일·step 표·사건 기록을 고치는 명령은 .rail/.lock 을 원자적으로 만들고(wx) 끝나면 지운다. 동시에 불린 명령은 차례를 기다린다.
 // 주인 프로세스가 죽었거나 너무 오래된 잠금은 버린다. 같은 프로세스 안에서는 겹쳐 잡아도 된다.
 export const LOCK_FILE = path.join(ROOT, '.rail/.lock')
@@ -136,7 +136,7 @@ process.on('exit', () => {
   if (lockDepth > 0) (lockDepth = 1), unlock()
 })
 
-// ---------- 자율 모드: 작업 중 표시, 멈춤 규칙, next (2.2판) ----------
+// ---------- 자율 모드: 작업 중 표시, 멈춤 규칙, next ----------
 // 누가: Claude 세션 번호, 없으면 Orca 세션 번호, 없으면 Orca 창. 모르면 'unknown'(그때는 늘 남으로 본다).
 export function whoAmI() {
   const e = process.env

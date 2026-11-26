@@ -1,4 +1,4 @@
-// 밤샘 자율(2.9판): 미리 승인한 뒤 마일스톤의 기능 목록(plan approve)과 사람 장면 판정 대기 목록.
+// 밤샘 자율: 미리 승인한 뒤 마일스톤의 기능 목록(plan approve)과 사람 장면 판정 대기 목록.
 import { autonomyOn } from './config.mjs'
 import { fail, now, out } from './core.mjs'
 import { nextOpenMilestone, openRisks, readSheet } from './docs.mjs'

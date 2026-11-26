@@ -3,7 +3,6 @@
 // "이미 있는" = git 이 추적하는 시험 파일, 또는 시험 step 이 끝날 때 찍은 기준선(.rail/test-baseline.json)에 든 파일.
 // 기준선 덕에 커밋 전의 새 시험도 잠긴다. 기준선 파일 자신도 잠근다. 새 시험 파일 만들기는 허용한다.
 // RAIL_ALLOW_TEST_EDIT=1이면 통과한다.
-// M14 뒤: 2.4판의 시제품 브랜치 합치기 막기는 지웠다(M6~M14 동안 막은 적 0번).
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { BASELINE, baselineFiles, git, isTestPath, railLog, readStdinJson, repoRoot, toRepoRel } from './lib.mjs'

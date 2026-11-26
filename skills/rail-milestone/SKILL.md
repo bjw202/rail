@@ -2,7 +2,7 @@
 name: rail-milestone
 description: 레일의 마일스톤 단계. 현재 마일스톤만 step 표로 나누고 작업자(Orca 또는 하위 에이전트)로 step 을 실행한다. /rail 이 부른다.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *), Bash(orca *), Bash(git *)
+allowed-tools: Bash(node .rail/bin/rail.mjs *), Bash(orca *), Bash(git *)
 ---
 # rail-milestone — step 표와 실행
 

@@ -20,7 +20,7 @@ export function openWorkers(st, ev = readEvents()) {
   return [...open.values()]
 }
 
-// ---------- 작업자 띄우기와 닫기 (2.2판) ----------
+// ---------- 작업자 띄우기와 닫기 ----------
 // 작업자 띄우기·닫기 절차의 원본. Orca CLI 는 orca.mjs 한 곳에서 부르고, Orca 의 동작은 바꾸지 않는다.
 // 결과 JSON 안에서 열쇠 key 의 값이 re 에 맞는 첫 문자열.
 export function findIn(obj, key, re) {
@@ -64,15 +64,18 @@ export function chooseSplit(layout, leader, workerTerms) {
   const target = shallow.find((l) => l.handle !== leader) ?? shallow[0]
   return { handle: target.handle, direction: target.dir === 'vertical' ? 'horizontal' : 'vertical' }
 }
-export const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`
-export function agentCommand(agent, name, testEdit = false) {
-  const env = testEdit ? 'RAIL_ALLOW_TEST_EDIT=1 ' : ''
-  if (agent === 'codex') return `${env}codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false`
-  return `${env}claude --model opus --dangerously-skip-permissions --name ${shq(name)}`
+const WIN = process.platform === 'win32'
+// Orca 창에 넣는 작업자 명령. 셸 문법이 다르므로 Windows 는 PowerShell(5.1·7), 그 밖은 sh 계열(bash·zsh)로 쓴다.
+// 작업자는 무인 진행을 위해 권한 확인을 끄고 뜬다(README "안전장치").
+export const shq = (s, win = WIN) => (win ? `'${String(s).replace(/'/g, "''")}'` : `'${String(s).replace(/'/g, `'\\''`)}'`)
+export function agentCommand(agent, name, testEdit = false, { win = WIN, cd = null } = {}) {
+  const pre = `${cd ? `cd ${shq(cd, win)}${win ? '; ' : ' && '}` : ''}${testEdit ? (win ? "$env:RAIL_ALLOW_TEST_EDIT='1'; " : 'RAIL_ALLOW_TEST_EDIT=1 ') : ''}`
+  if (agent === 'codex') return `${pre}codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false`
+  return `${pre}claude --model opus --dangerously-skip-permissions --name ${shq(name, win)}`
 }
-const EXT = process.platform === 'win32' ? (process.env.PATHEXT ?? '.EXE;.CMD').split(';') : ['']
+const EXT = WIN ? (process.env.PATHEXT ?? '.EXE;.CMD').split(';') : ['']
 export const onPath = (bin) => (process.env.PATH ?? '').split(path.delimiter).some((d) => d && EXT.some((x) => fs.existsSync(path.join(d, bin + x))))
-// 2.6판: 이 마일스톤에서 step 이름과 시험 고치기(RAIL_ALLOW_TEST_EDIT 또는 "시험 고치")가 든 질문에 사람이 허락했으면
+// 이 마일스톤에서 step 이름과 시험 고치기(RAIL_ALLOW_TEST_EDIT 또는 "시험 고치")가 든 질문에 사람이 허락했으면
 // { at, by: 'human' }. 허락 한 번에 작업자 하나다(그 뒤 test_edit 로 띄운 worker_start 가 있으면 다 쓴 것).
 // 사람 허락이 없고 staleTests 가 agent 면 판정 작업자의 판정을 본다(stale.mjs: 허락 또는 { refused }).
 export function testEditGrant(st, step) {
@@ -149,7 +152,7 @@ export function workerStart(steps, flags, usage) {
     if (p.grant?.refused) out(`[시험 고치기] ${p.step}: ${p.grant.refused}`)
     if (g?.by === 'stale' && !read(p.spec).includes(`(판정 ${g.file})`))
       fs.appendFileSync(p.spec, `\n\n## 고쳐도 되는 시험 줄 (레일이 붙임, 판정 ${g.file})\n${g.lines.map((l) => `- ${l.file}:${l.line} — ${l.changed_by} 로 바뀐 동작(옛 값: ${l.pinned})`).join('\n')}\n이 줄들만 새 동작에 맞게 고친다. 판정 파일의 keep 줄과 다른 시험은 고치지 말고, 걸리면 코드를 고치거나 worker_done 에 까닭을 적는다.\n`)
-    const cmd = `${wt ? `cd ${shq(wt.worktree)} && ` : ''}${agentCommand(agent, p.name, !!g)}`
+    const cmd = agentCommand(agent, p.name, !!g, { cd: wt?.worktree })
     // 창 고르기와 나누기는 잠금 안에서 한다(동시에 불린 두 명령이 같은 창을 나누지 않게).
     const made = withLock(() => {
       const st = loadState()
@@ -223,7 +226,7 @@ export function workerDone(steps, flags) {
       continue
     }
     if (report?.ok) out(`[작업자 보고] ${w.step}\n${lastLines(report.json ? JSON.stringify(report.json.result ?? report.json, null, 2) : report.text, 40).join('\n')}`)
-    // 새 작업 공간에 띄운 시제품 작업자(2.4판)는 창 핸들이 없다. 그 일의 창을 놓아 준다(worker-release).
+    // 새 작업 공간에 띄운 시제품 작업자는 창 핸들이 없다. 그 일의 창을 놓아 준다(worker-release).
     const close = w.terminal ? orca(['terminal', 'close', '--terminal', w.terminal, '--json'], 30_000) : w.proto && w.dispatch ? orca(['orchestration', 'worker-release', '--dispatch', w.dispatch, '--json'], 30_000) : { ok: false, error: '창 핸들이 없습니다' }
     const result = flags.result ?? (state === 'failed' ? 'fail' : 'ok')
     withLock(() => {

@@ -1,7 +1,7 @@
 // .rail/config.json 읽기: 커밋 정책, 자율 모드 설정, 판 번호, 검증기 목록.
 import { F, read } from './core.mjs'
 
-// isolation(M14 시험): worktree 면 만드는 역할의 작업자가 저마다 git worktree 에서 일한다(worktree.mjs). 사람만 바꾼다(--said).
+// isolation: worktree 면 만드는 역할의 작업자가 저마다 git worktree 에서 일한다(worktree.mjs). 사람만 바꾼다(--said).
 export const POLICIES = { commit: { key: 'commitPolicy', values: ['ask', 'auto-local'], default: 'ask' }, isolation: { key: 'isolation', values: ['shared', 'worktree'], default: 'shared' } }
 export function loadConfig() {
   try {

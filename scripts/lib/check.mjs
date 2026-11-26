@@ -1,4 +1,4 @@
-// 기능 확인(2.9판): 기능 줄의 작업자가 끝나면 만들지 않은 새 작업자가 완료 기준을 어기는 경우를 찾는다.
+// 기능 확인: 기능 줄의 작업자가 끝나면 만들지 않은 새 작업자가 완료 기준을 어기는 경우를 찾는다.
 // 결과는 .rail/check/<step>.json({"must":[...],"nice":[...]}), 재현 시험은 .rail/check/<step>/*.test.mjs(점 폴더라 node --test 가 저절로 돌리지 않는다).
 import path from 'node:path'
 import { F, read } from './core.mjs'

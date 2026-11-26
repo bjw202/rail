@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { GOOD_PLAN, RAIL, events, put, state, tmp } from './helpers.mjs'
+import { GOOD_PLAN, RAIL, TEST_EDIT_ENV, events, put, state, tmp } from './helpers.mjs'
 
 function run(root, args, extra = {}) {
   const env = { ...process.env, ...extra, RAIL_ROOT: root }
@@ -64,7 +64,7 @@ function judge(root, orca, text) {
   ok(run(root, ['worker', 'done', 'M0-1-stale'], orca.env))
 }
 const start = (root, orca) => run(root, ['worker', 'start', 'M0-1', '--agent', 'claude', '--role', 'impl'], orca.env)
-const ENV = 'RAIL_ALLOW_TEST_EDIT=1 '
+const ENV = TEST_EDIT_ENV
 const granted = (root) => events(root).filter((e) => e.event === 'worker_start' && e.step === 'M0-1' && e.test_edit)
 
 describe('판정으로 시험 고치기 허락', () => {

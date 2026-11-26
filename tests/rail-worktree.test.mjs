@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { RAIL, events, git, planDoc, put, state, tmp } from './helpers.mjs'
+import { RAIL, WIN, events, git, planDoc, put, state, tmp } from './helpers.mjs'
 
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
 const PLAN = planDoc([['M0'], ['M1']])
@@ -74,7 +74,7 @@ describe('worktree 방식: 만들기 → 작업자 커밋 → 합치기 → 지�
     assert.deepEqual(branches(r.root), ['rail/M0-1'])
     assert.equal(git(dir, 'rev-parse', 'HEAD').trim(), head)
     const create = r.calls().find((c) => c[0] === 'terminal' && c[1] === 'create')
-    assert.match(create[create.indexOf('--command') + 1], new RegExp(`^cd '${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}' && claude `))
+    assert.match(create[create.indexOf('--command') + 1], new RegExp(`^cd '${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'${WIN ? ';' : ' &&'} claude `))
     assert.match(readFileSync(path.join(r.root, '.orchestration/M0-1-spec.md'), 'utf8'), /## 작업 폴더와 커밋 \(레일이 붙임.*\n- 이 일은 git worktree .*rail-M0-1 \(브랜치 rail\/M0-1\)/)
     const ws = events(r.root).find((e) => e.event === 'worker_start')
     assert.equal(ws.worktree, dir)

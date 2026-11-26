@@ -27,14 +27,14 @@ const ORDER = {
     ...(rm?.ms.some((x) => x.id === st.milestone) ? [] : [`기획서 마일스톤 지도에 ${st.milestone ?? '해당 마일스톤'} 이(가) 없습니다`]),
     ...openRisks(st.milestone, rm).map((d) => `착수 전 ${d.id} 가 풀리지 않았습니다 (${d.why})`)
   ],
-  // 2.9c: 머리줄만 있는 빈 step 표를 "모두 끝남"으로 넘기지 않는다(M12 rail_gap). 표가 아예 없을 때는 예전처럼 보지 않는다.
+  // 머리줄만 있는 빈 step 표를 "모두 끝남"으로 넘기지 않는다. 표가 아예 없을 때는 보지 않는다.
   check: (st) => (readPlan(st.milestone)?.rows.length === 0 ? [`docs/plan/${st.milestone}.md 에 step 줄이 없습니다 (step 표를 먼저 채우세요)`] : [])
 }
 function closeNeeds(st, rm) {
   const content = stepsDoneProblems(st)
   const warnings = []
   const sc = st.gates.scene_checked[st.milestone]
-  // 2.9판: 자율 모드에서 리허설이 모두 통과했고 다음 마일스톤이 미리 승인돼 있으면, 사람 판정을 대기 목록에 올리고 닫는다.
+  // 자율 모드에서 리허설이 모두 통과했고 다음 마일스톤이 미리 승인돼 있으면, 사람 판정을 대기 목록에 올리고 닫는다.
   const pc = sc ? null : pendingClose(st, rm)
   if (pc?.ok) warnings.push(`${st.milestone} 를 사람 장면 판정 없이 닫고 판정 대기 목록에 올립니다 (${pc.why})`)
   else if (!sc) content.push(`${st.milestone} 의 사람 장면 확인 기록이 없습니다 (scene 명령)`)
@@ -71,8 +71,6 @@ export function gate(target, st, opts = {}) {
 }
 
 // step-start / step-done 이 함께 쓰는 관문: milestone 단계, 지금 마일스톤의 표에 있는 step, 아직 끝나지 않음. 이것 없이는 상태 칸을 쓸 수 없다.
-// 2.9판: 표 검사, 기다리는 step 확인은 지웠다. 함께 시작할 수 있는 step 은 status 의 "다음 할 일"이 알려 준다.
-// M14 뒤: 2.9c 에서 되살린 파일 겹침 거절은 다시 지웠다. worktree 방식에서는 같은 파일을 둘이 고치면 worktree merge 가 부딪힘으로 알린다.
 export function stepGate(cmd, stepId) {
   const st = loadState()
   const refuse = (problems) => {

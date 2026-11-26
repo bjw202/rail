@@ -22,7 +22,7 @@ export function cmdCheck({ pos, flags }, advance) {
     process.stderr.write(`[관문] "${target}" 로 갈 수 없습니다. 빠진 것:\n${g.problems.map((p) => `  - ${p}`).join('\n')}\n돌아갈 단계: ${g.back}\n`)
     process.exit(1)
   }
-  // 관문이 통과시킨 것도 남긴다(2.2판: 관문이 몇 번 일했는지 센다).
+  // 관문이 통과시킨 것도 남긴다(관문이 몇 번 일했는지 센다).
   appendLog('gate_passed', st, { target, via: advance ? 'advance' : 'check' })
   for (const w of g.warnings) out(`[경고] ${w}`)
   if (g.warnings.length && advance) appendLog('gate_warning', st, { target, warnings: g.warnings })
@@ -47,7 +47,7 @@ export function cmdCheck({ pos, flags }, advance) {
     closedId = st.milestone
     offAtClose = disabledParts()
     for (const { w, r } of cleanMerged(st)) out(`[worktree] 합쳐진 rail-${w.step} ${r.ok ? '지움' : `남김 — ${r.why}`}`)
-    // 2.9판: 장면 판정 없이 닫는 길(관문 close 의 경고)은 판정 대기 목록에 남긴다.
+    // 장면 판정 없이 닫는 길(관문 close 의 경고)은 판정 대기 목록에 남긴다.
     const rh = st.gates.rehearsed?.[closedId]
     // 판정으로 고친 시험 목록(커밋 포함)을 붙여 둔다. 닫으면 지금 마일스톤이 바뀌어 사건 기록에서 다시 모으지 못한다.
     const sl = staleList(st).map(withCommit)

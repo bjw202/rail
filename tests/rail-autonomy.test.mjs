@@ -6,7 +6,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { GOOD_PLAN, RAIL, denied, events, git, makeRepo, planDoc, put, runHook, state, tmp } from './helpers.mjs'
+import { GOOD_PLAN, RAIL, denied, events, git, makeRepo, planDoc, put, q, runHook, state, tmp } from './helpers.mjs'
 
 const HEAD = '| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |\n|---|---|---|---|---|---|---|\n'
 const PLAN = planDoc([['M0']])
@@ -343,7 +343,7 @@ describe('worker start / done', () => {
     const [split] = sub(calls, 'terminal', 'split')
     assert.equal(opt(split, '--terminal'), 'term_leader')
     assert.equal(opt(split, '--direction'), 'vertical')
-    assert.equal(opt(split, '--command'), "claude --model opus --dangerously-skip-permissions --name 'M0-1 짧은 일'")
+    assert.equal(opt(split, '--command'), `claude --model opus --dangerously-skip-permissions --name ${q('M0-1 짧은 일')}`)
     const term = orca.layout().second.handle
     assert.equal(opt(sub(calls, 'terminal', 'set-pane-title')[0], '--title'), 'M0-1 짧은 일')
     assert.equal(opt(sub(calls, 'terminal', 'wait')[0], '--for'), 'tui-idle')
@@ -375,6 +375,13 @@ describe('worker start / done', () => {
     const r = run(root, ['worker', 'start', 'M0-1', '--agent', 'codex', '--role', 'test'], { ...orca.env, PATH: fakeCodex(root) })
     ok(r)
     assert.equal(opt(sub(orca.calls(), 'terminal', 'split')[0], '--command'), 'codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false')
+  })
+
+  test('작업자 명령은 Windows 면 PowerShell, 그 밖은 sh 문법으로 쓴다(환경 변수 앞붙임, 따옴표, cd)', async () => {
+    const { agentCommand } = await import('../scripts/lib/workers.mjs')
+    assert.equal(agentCommand('claude', "M0-1 it's", true, { win: false, cd: '/w/rail-M0-1' }), `cd '/w/rail-M0-1' && RAIL_ALLOW_TEST_EDIT=1 claude --model opus --dangerously-skip-permissions --name 'M0-1 it'\\''s'`)
+    assert.equal(agentCommand('claude', "M0-1 it's", true, { win: true, cd: 'C:\\w\\rail-M0-1' }), `cd 'C:\\w\\rail-M0-1'; $env:RAIL_ALLOW_TEST_EDIT='1'; claude --model opus --dangerously-skip-permissions --name 'M0-1 it''s'`)
+    assert.equal(agentCommand('codex', 'x', false, { win: true }), 'codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false')
   })
 
   test('codex 가 PATH 에 없으면 Claude 작업자로 대신 띄우고 경고와 codex_missing 을 남긴다', () => {
@@ -516,11 +523,11 @@ describe('마무리 검사가 남기는 진척 (시험 통과 수)', () => {
     const repo = makeRepo()
     const cache = () => JSON.parse(readFileSync(path.join(repo, '.git/rail-stop-check.json'), 'utf8'))
     put(repo, 'src/a.mjs', 'c2\n')
-    runHook('stop-check.mjs', { cwd: repo }, { RAIL_STOP_CHECK_CMD: "echo 'ℹ pass 5'" })
+    runHook('stop-check.mjs', { cwd: repo }, { RAIL_STOP_CHECK_CMD: 'node -e "console.log(\'ℹ pass 5\')"' })
     assert.equal(cache().passCount, 5)
     assert.equal(cache().passUpAt, undefined)
     put(repo, 'src/a.mjs', 'c3\n')
-    runHook('stop-check.mjs', { cwd: repo }, { RAIL_STOP_CHECK_CMD: "echo 'ℹ pass 7'" })
+    runHook('stop-check.mjs', { cwd: repo }, { RAIL_STOP_CHECK_CMD: 'node -e "console.log(\'ℹ pass 7\')"' })
     assert.equal(cache().passCount, 7)
     const up = cache().passUpAt
     assert.ok(Date.now() - Date.parse(up) < 60_000)

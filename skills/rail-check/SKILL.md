@@ -2,7 +2,7 @@
 name: rail-check
 description: 레일의 장면 확인 단계. 마일스톤 끝에 장면 점검표를 만들어 리허설 작업자가 실제 앱에서 해 보게 하고, 사람이 리허설 결과를 본 판정과 본 것 한 줄을 기록한 뒤 마일스톤을 닫는다. /rail 이 부른다.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *)
+allowed-tools: Bash(node .rail/bin/rail.mjs *)
 ---
 # rail-check — 장면 확인
 

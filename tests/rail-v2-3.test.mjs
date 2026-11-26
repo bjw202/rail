@@ -22,9 +22,9 @@ const names = (root) => events(root).map((e) => e.event)
 const T = (n) => new Date(Date.UTC(2026, 10, 24, 0, n)).toISOString()
 const ev = (n, event, milestone, data = {}) => JSON.stringify({ t: T(n), event, stage: 'milestone', milestone, ...data })
 
-// 가짜 사건 기록: M0 은 2.2판 전(gate_passed 없음), M1·M2·M3 은 기록 있음.
+// 가짜 사건 기록: 닫힌 마일스톤마다 관문·훅·검증기·멈춤 사건.
 function fakeLog(closed = ['M1', 'M2', 'M3']) {
-  const lines = [ev(1, 'step_start', 'M0', { step: 'M0-1' }), ev(2, 'gate_blocked', 'M0', { target: 'close' }), ev(3, 'milestone_closed', 'M0')]
+  const lines = []
   let n = 10
   for (const m of closed) {
     lines.push(
@@ -33,7 +33,6 @@ function fakeLog(closed = ['M1', 'M2', 'M3']) {
       ev(n++, 'gate_blocked', m, { target: 'step-start', step: `${m}-2` }),
       ev(n++, 'gate_passed', m, { target: 'step-start', step: `${m}-2` }),
       ev(n++, 'hook_held', m, { hook: 'stop-check', reason: '`node --test` 가 종료 코드 1로 끝났다' }),
-      ev(n++, 'hook_held', m, { hook: 'stop-check', reason: '계획 표 검사(`node .rail/bin/rail.mjs validate`)' }),
       ev(n++, 'verify_run', m, { ok: false, results: [] }),
       ev(n++, 'verify_run', m, { ok: true, results: [] }),
       ev(n++, 'autonomy_stop', m, { code: 'human' }),
@@ -63,20 +62,15 @@ describe('쓰임 세기 (usage)', () => {
     assert.equal(part(u, 'gate:close').insurance, true)
   })
 
-  test('기록이 없던 마일스톤(2.2판 전)은 "기록 없음"으로 표시하고 세지 않는다', () => {
-    const root = usageRoot()
-    const u = usageJson(root)
-    assert.deepEqual(u.milestones.find((m) => m.id === 'M0'), { id: 'M0', recorded: false, closed: true })
-    assert.equal(part(u, 'gate:close').by.M0, undefined, 'M0 의 gate_blocked 는 세지 않는다')
-    const table = run(root, ['usage']).out
-    assert.match(table, /기록 없음 \(2\.2판 전\): M0/)
+  test('usage 표는 마일스톤마다 작동/막음을 한 칸씩 보인다', () => {
+    const table = run(usageRoot(), ['usage']).out
     assert.match(table, /gate:order\s+1\/0\s+1\/0\s+1\/0/)
     assert.match(table, /stop-check\s+\?\/1/)
   })
 })
 
 describe('빼기 후보', () => {
-  test('기록 있는 닫힌 마일스톤이 3개 미만이면 후보가 없다', () => {
+  test('닫힌 마일스톤이 3개 미만이면 후보가 없다', () => {
     const u = usageJson(usageRoot({}, fakeLog(['M1', 'M2'])))
     assert.deepEqual(u.candidates.list, [])
     assert.match(u.candidates.why, /2개라 아직 뽑지 않습니다/)
@@ -178,7 +172,7 @@ describe('닫힘 알림 (2.3판)', () => {
     ok(r)
     const body = sentBody(root).split('\n')
     assert.match(body[0], /^작업 \d+분 · 사람 답 0번 · 레일 수정 0번 · CW 42% · 압축 2번$/)
-    assert.match(body[1], /^빼기 후보: 없음 \(기록 있는 닫힌 마일스톤이 1개라/)
+    assert.match(body[1], /^빼기 후보: 없음 \(닫힌 마일스톤이 1개라/)
     assert.match(body[2], /^꺼 둔 부품: rehearsal/)
     assert.deepEqual(config(root).disabled, [])
     assert.equal(events(root).find((e) => e.event === 'part_enabled').part, 'rehearsal')
@@ -200,9 +194,10 @@ describe('레일 크기 (rail_size)', () => {
     const root = tmp('rail23s-')
     put(root, '.rail/config.json', JSON.stringify({ railVersion: version }))
     put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'done', milestone: null, closed: [] }))
-    put(root, 'plugin/scripts/a.mjs', 'a\n'.repeat(100))
-    put(root, 'plugin/skills/rail-x/SKILL.md', 'b\n'.repeat(10))
-    put(root, 'plugin/skills/other/SKILL.md', 'c\n'.repeat(1000))
+    put(root, '.rail/bin/a.mjs', 'a\n'.repeat(60))
+    put(root, '.rail/hooks/h.mjs', 'h\n'.repeat(40))
+    put(root, '.claude/skills/rail-x/SKILL.md', 'b\n'.repeat(10))
+    put(root, '.claude/skills/other/SKILL.md', 'c\n'.repeat(1000))
     put(root, 'docs/RAIL.md', `# 레일\n레일 ${version}판\n`)
     if (log) put(root, '.rail/log.jsonl', log)
     return root
@@ -211,13 +206,12 @@ describe('레일 크기 (rail_size)', () => {
 
   test('판 번호가 바뀌는 첫 명령 때 한 번 레일 줄 수를 남긴다(레일 스킬만, validate 는 쓰지 않음)', () => {
     const root = sizeRoot('2.3')
-    const plug = (r) => ({ env: { CLAUDE_PLUGIN_ROOT: path.join(r, 'plugin') } })
-    ok(run(root, ['status'], plug(root)))
-    ok(run(root, ['status'], plug(root)))
+    ok(run(root, ['status']))
+    ok(run(root, ['status']))
     assert.equal(sizes(root).length, 1)
-    assert.deepEqual([sizes(root)[0].version, sizes(root)[0].lines, sizes(root)[0].files], ['2.3', 112, 3])
+    assert.deepEqual([sizes(root)[0].version, sizes(root)[0].lines, sizes(root)[0].files], ['2.3', 112, 4])
     put(root, '.rail/config.json', JSON.stringify({ railVersion: '2.4' }))
-    ok(run(root, ['status'], plug(root)))
+    ok(run(root, ['status']))
     assert.deepEqual(sizes(root).map((e) => e.version), ['2.3', '2.4'])
     assert.deepEqual(sizes(root)[1].prev, { version: '2.3', lines: 112 })
   })
@@ -274,7 +268,7 @@ describe('압축 이어받기', () => {
     const ctx = JSON.parse(r.out).hookSpecificOutput.additionalContext
     assert.match(ctx, /위치: M0 · step 진행 \(M0-1\)\n기다리는 것: 사람의 답/)
     assert.match(ctx, /작업자: M0-1\(claude, impl, 창 term_w1, 일 ctx_abc123\)/)
-    assert.match(ctx, /압축됐다\. docs\/RAIL\.md 와 지금 마일스톤의 step 표\(docs\/plan\/M0\.md\)를 다시 읽고, 진행 중 작업자를 `node ".*\/scripts\/rail\.mjs" status` 로 확인한 뒤 이어서 하라\./)
+    assert.match(ctx, /압축됐다\. docs\/RAIL\.md 와 지금 마일스톤의 step 표\(docs\/plan\/M0\.md\)를 다시 읽고, 진행 중 작업자를 `node \.rail\/bin\/rail\.mjs status` 로 확인한 뒤 이어서 하라\./)
     const e = events(root).at(-1)
     assert.deepEqual([e.event, e.session], ['compact_resumed', 'sess-2'])
     assert.equal(state(root).leader_session, 'sess-2')
@@ -282,7 +276,7 @@ describe('압축 이어받기', () => {
 
   test('마무리 검사 훅도 세션을 리더로 적고, 꺼 둔 부품은 part 가 종료 코드 1 로 알린다(훅이 예정된 실패 통과를 건너뛸 때 씀)', () => {
     const root = compactRoot()
-    const r = runHook('stop-check.mjs', { cwd: root, session_id: 'sess-stop' }, { RAIL_STOP_CHECK_CMD: 'true' })
+    const r = runHook('stop-check.mjs', { cwd: root, session_id: 'sess-stop' }, { RAIL_STOP_CHECK_CMD: 'node -e ""' })
     assert.equal(r.code, 0, r.stderr)
     assert.equal(state(root).leader_session, 'sess-stop')
   })

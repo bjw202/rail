@@ -23,7 +23,7 @@ export const isActive = (s) => /^⏳/.test(s ?? '')
 export const isTestRole = (r) => /시험/.test(r.role)
 export const isImplRole = (r) => /구현/.test(r.role)
 export const isReviewRole = (r) => /리뷰/.test(r.role)
-// 2.9판 기본: 기능 줄 하나 = 사용자가 알아볼 기능 하나(시험과 구현을 함께). 끝나면 확인 작업자가 본다. 고침 줄은 리허설 실패를 고친다.
+// 기본: 기능 줄 하나 = 사용자가 알아볼 기능 하나(시험과 구현을 함께). 끝나면 확인 작업자가 본다. 고침 줄은 리허설 실패를 고친다.
 export const isFeatureRole = (r) => /기능/.test(r.role)
 export const isFixRole = (r) => /고침/.test(r.role)
 
@@ -56,7 +56,7 @@ export function readPlan(id) {
   return { id, file, rel: `docs/plan/${id}.md`, lines, head, cols, statusCol, rows }
 }
 
-// 2.1판 "기다리는 step" 칸: 비면 null(표 순서대로 앞 step 을 모두 기다림, 예전 표와 같음), "없음"·"-" 이면 [], 아니면 적힌 step 들.
+// "기다리는 step" 칸: 비면 null(표 순서대로 앞 step 을 모두 기다림), "없음"·"-" 이면 [], 아니면 적힌 step 들.
 export function parseWaits(cell) {
   const t = String(cell ?? '').trim()
   if (!t) return null
@@ -109,13 +109,13 @@ export function planProblems(plan, st) {
   return p
 }
 
-// 현재 마일스톤 밖의 step 표(docs/plan/Mx.md)가 있으면 위반이다. 2.9판(덜어내기 둘째)부터 관문은 이것을 보지 않고, status 의 "다음 할 일"만 알린다.
+// 현재 마일스톤 밖의 step 표(docs/plan/Mx.md)가 있으면 위반이다. 관문은 이것을 보지 않고, status 의 "다음 할 일"만 알린다.
 export function planViolations(st, allowCurrent) {
   if (!fs.existsSync(F.plan)) return []
   const out = []
   for (const n of fs.readdirSync(F.plan)) {
     const m = n.match(/^(M\d+)\.md$/)
-    // 2.9판: 사람이 미리 승인한 기능 목록(plan approve)은 뒤 마일스톤의 것이어도 위반이 아니다.
+    // 사람이 미리 승인한 기능 목록(plan approve)은 뒤 마일스톤의 것이어도 위반이 아니다.
     if (!m || st.closed.includes(m[1]) || st.gates?.plan_approved?.[m[1]]) continue
     if (m[1] === st.milestone && allowCurrent) continue
     const why =

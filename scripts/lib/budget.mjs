@@ -73,7 +73,7 @@ export function budgetStatus(st, ev, a, cache) {
   return res
 }
 // costCommand 에 { intervals:[{from,to}] } 를 표준 입력으로 주고 { usd:[...] } 를 받는다. 45초 안에 끝나야 한다.
-// cwd 를 주면(2.4판 시제품) 그 작업 공간의 기록만 잰다. 그렇게 재는 명령은 출력에 같은 cwd 를 돌려준다.
+// cwd 를 주면(시제품) 그 작업 공간의 기록만 잰다. 그렇게 재는 명령은 출력에 같은 cwd 를 돌려준다.
 export function readCost(intervals, cwd = null) {
   const cmd = autonomy().budget.costCommand
   const t0 = Date.now()

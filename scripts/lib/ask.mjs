@@ -1,5 +1,4 @@
 // 사람에게 묻고 답을 받는 명령: ask, answer.
-import { railVersion } from './config.mjs'
 import { fail, now, out } from './core.mjs'
 import { answerScene, sceneProblems, sceneQuestion } from './scene.mjs'
 import { staleList } from './stale.mjs'
@@ -26,7 +25,7 @@ export function cmdAsk({ pos, flags }) {
   // 질문 수에 상한은 없다(기획서 판). 멈춤은 rail-plan 스킬의 규칙(더 물어서 바뀔 것을 한 문장으로 말 못 하면 끝)이 정한다.
   if (kind === 'interview' && !sameSlot) st.interview.asked += 1
   const stale = scene ? staleList(st).length : 0
-  st.human_ask = { q, kind, at: now(), ...(scene ? { milestone: st.milestone, rail: railVersion() } : {}), ...(stale ? { stale } : {}) }
+  st.human_ask = { q, kind, at: now(), ...(scene ? { milestone: st.milestone } : {}), ...(stale ? { stale } : {}) }
   st.waiting_for = 'human'
   saveState(st)
   if (old) appendLog('ask_replaced', st, { old: old.q, new: q, why: typeof flags.why === 'string' ? flags.why : null, kind, old_kind: old.kind })

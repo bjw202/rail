@@ -1,5 +1,4 @@
 // 시험 기준선(.rail/test-baseline.json): 시험 잠금 훅이 커밋 전의 새 시험까지 잠그는 데 쓰는 시험 파일 목록과 해시.
-// 2.9판: 시험 먼저 step 뒤의 "예정된 실패" 창과 그 창이 쓰던 시작 기록(starts·changed·changed_by)을 뺐다.
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'

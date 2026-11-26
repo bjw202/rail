@@ -6,7 +6,7 @@ import { F } from './core.mjs'
 import { loadState, lock, saveState, unlock } from './state.mjs'
 import { openWorkers } from './workers.mjs'
 
-// ---------- 압축 이어받기 (2.3판) ----------
+// ---------- 압축 이어받기 ----------
 // 훅 입력(표준 입력의 JSON).
 // 터미널이나 /dev/null(문자 장치)이면 읽지 않는다. 훅은 파이프로 JSON 을 주고 닫는다.
 export function hookInput() {

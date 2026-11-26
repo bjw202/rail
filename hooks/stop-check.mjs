@@ -1,23 +1,13 @@
 #!/usr/bin/env node
 // Stop 훅: Claude 세션이 멈추려 할 때, 작업 폴더가 바뀌었으면
 // 마지막 통과 뒤 바뀌었으면 빌드와 시험을 돌린다.
-// 2.9판(덜어내기 둘째): 먼저 돌리던 계획 표 검사(rail.mjs validate)를 뺐다. 표는 step-start·step-done 이 상태 칸을 쓰며 읽는다.
 // 실패하면 종료 코드 2와 표준 오류의 이유로 세션이 이어서 고치게 한다.
-// 2.9판: 시험 먼저 step 뒤의 "예정된 실패" 창을 뺐다(M10·M11 동안 쓰이지 않음). 실패는 모두 붙잡는다.
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { BASELINE, git, railLog, readStdinJson, repoRoot } from './lib.mjs'
+import { BASELINE, RAIL_BIN, childEnv, git, railLog, readStdinJson, repoRoot } from './lib.mjs'
 
-const RAIL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts/rail.mjs')
-// 부모가 node --test 안이어도 검사 명령은 독립된 시험 실행이어야 한다.
-function childEnv() {
-  const env = { ...process.env }
-  delete env.NODE_TEST_CONTEXT
-  return env
-}
 // 검사 명령은 .rail/config.json 의 checkCommand 다. 비어 있으면(제품 스택이 아직 없으면) 건너뛴다.
 // RAIL_STOP_CHECK_CMD 환경 변수가 있으면 그것이 우선한다(시험용).
 function readCommand(root) {
@@ -110,7 +100,7 @@ function run(root) {
 
 const stripAnsi = (t) => t.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
 
-// 통과 수(ℹ pass N). 레일 자율 모드가 "진척"(시험 통과 수가 늘어난 때)을 재는 데 쓴다(2.2판).
+// 통과 수(ℹ pass N). 레일 자율 모드가 "진척"(시험 통과 수가 늘어난 때)을 재는 데 쓴다.
 function passCount(text) {
   const all = [...stripAnsi(text).matchAll(/^(?:ℹ|#) pass (\d+)\s*$/gm)]
   return all.length ? Number(all.at(-1)[1]) : null
@@ -153,9 +143,9 @@ async function main() {
   const cwd = typeof input.cwd === 'string' && input.cwd ? input.cwd : process.cwd()
   const root = repoRoot(cwd)
   if (!root) return
-  // 2.3판: 이 세션을 리더 세션으로 적는다(닫힘 알림의 컨텍스트 사용률). 작업자 창의 세션은 rail.mjs 가 거른다.
-  if (typeof input.session_id === 'string' && existsSync(RAIL) && existsSync(path.join(root, '.rail/state.json')))
-    spawnSync(process.execPath, [RAIL, 'leader', input.session_id], { env: { ...childEnv(), RAIL_ROOT: root, RAIL_NO_TOUCH: '1' }, timeout: 10_000 })
+  // 이 세션을 리더 세션으로 적는다(닫힘 알림의 컨텍스트 사용률). 작업자 창의 세션은 rail.mjs 가 거른다.
+  if (typeof input.session_id === 'string' && RAIL_BIN && existsSync(path.join(root, '.rail/state.json')))
+    spawnSync(process.execPath, [RAIL_BIN, 'leader', input.session_id], { env: childEnv(root), timeout: 10_000 })
   COMMAND = readCommand(root)
   const gitDir = git(root, ['rev-parse', '--absolute-git-dir']).out.trim()
   const cacheFile = gitDir ? path.join(gitDir, 'rail-stop-check.json') : null
@@ -165,7 +155,7 @@ async function main() {
   }
 
   // 실패로 붙잡는다. 같은 실패는 MAX_HOLDS 번까지만 붙잡고 그 뒤에는 경고와 함께 통과시킨다.
-  // 사람의 답을 기다리는 중(state 의 human_ask)이면 붙잡지 않는다. 그 질문 동안 같은 실패는 한 번만 알린다(2.1판).
+  // 사람의 답을 기다리는 중(state 의 human_ask)이면 붙잡지 않는다. 그 질문 동안 같은 실패는 한 번만 알린다.
   const hold = (what, body) => {
     const sig = createHash('sha256').update(stableText(body)).digest('hex')
     const ask = openQuestion(root)

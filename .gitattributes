@@ -1,0 +1,2 @@
+# 줄바꿈을 LF 로 고정한다(Windows 에서 받아도 시험과 스크립트가 같은 글을 본다).
+* text=auto eol=lf

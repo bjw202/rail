@@ -1,4 +1,4 @@
-// 작업자마다 git worktree(isolation=worktree, M14 시험): 만들기, 합치기, 지우기, 남은 것 찾기. 모두 이 코드가 한다.
+// 작업자마다 git worktree(isolation=worktree): 만들기, 합치기, 지우기, 남은 것 찾기. 모두 이 코드가 한다.
 // 이름 규칙: 브랜치 rail/<step>, 폴더 <worktreeDir>/rail-<step>. git 으로 만들므로 Orca 목록에 없고, git 으로 지운다.
 // 안 합쳐진 브랜치는 저절로 지우지 않는다(git branch -d 도 한 번 더 막는다).
 import { spawnSync } from 'node:child_process'

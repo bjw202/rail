@@ -48,7 +48,7 @@ const ITEMS = [
 
 describe('verify 관문', () => {
   test('검증기가 모두 통과하면 check 로 가고, 이름·결과·시간·출력 끝을 verify_run 에 남긴다', () => {
-    const root = ready({ verify: [{ name: 'ok', command: `${exitWith(0)} && echo 끝줄`, why: '시험' }] })
+    const root = ready({ verify: [{ name: 'ok', command: `${NODE} -e "console.log('끝줄')"`, why: '시험' }] })
     const v = rail(root, 'verify')
     assert.equal(v.code, 0, v.err)
     const run = events(root).find((e) => e.event === 'verify_run')

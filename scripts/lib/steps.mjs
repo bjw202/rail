@@ -23,7 +23,7 @@ export function cmdStepStart({ pos }) {
   const first = !readEvents().some((e) => e.event === 'step_start' && e.milestone === st.milestone)
   appendLog('step_start', st, { step: stepId, role: row.role, ...(others.length ? { alongside: others } : {}) })
   out(`[step] ${stepId} 시작 (${row.role}). 상태 칸: ⏳ 진행 중${others.length ? `\n함께 진행 중: ${others.join(', ')}` : ''}`)
-  // 자율 모드(2.2판): 마일스톤의 첫 step 을 사람의 "시작" 승인 없이 열었음을 남긴다.
+  // 자율 모드: 마일스톤의 첫 step 을 사람의 "시작" 승인 없이 열었음을 남긴다.
   if (first && autonomyOn()) {
     appendLog('auto_start', st, { step: stepId, steps: plan.rows.map((r) => r.step) })
     out(`[자율] 시작 승인을 묻지 않고 ${st.milestone} 를 시작했습니다 (auto_start 기록).`)
@@ -42,7 +42,7 @@ export function cmdStepDone({ pos, flags }) {
   const wt = leftWorktrees().filter((w) => !w.merged && (w.step === stepId || w.step.startsWith(`${stepId}-`))).map((w) => w.branch)
   if (wt.length) appendLog('gate_blocked', st, { target: 'worktree-merge', via: 'step-done', step: stepId, problems: wt }), fail(`[관문] step-done ${stepId}: 안 합쳐진 작업자 브랜치가 있습니다: ${wt.join(', ')} (worktree merge <step>)`)
   appendLog('gate_passed', st, { target: 'step-done', step: stepId })
-  // 2.9판: 기능 줄은 확인 기록이 있어야(꼭 고칠 것이 있으면 고침 작업자까지 끝나야) 끝난다.
+  // 기능 줄은 확인 기록이 있어야(꼭 고칠 것이 있으면 고침 작업자까지 끝나야) 끝난다.
   if (isFeatureRole(row) && !partOff('feature-check')) {
     const fp = featureProblems(st, row)
     if (fp.length) appendLog('gate_blocked', st, { target: 'feature-check', step: stepId, problems: fp }), fail(`[관문] step-done ${stepId} 를 할 수 없습니다. 빠진 것:\n${fp.map((p) => `  - ${p}`).join('\n')}`)

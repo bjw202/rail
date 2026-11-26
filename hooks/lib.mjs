@@ -57,15 +57,20 @@ export function baselineFiles(root) {
   }
 }
 
-// 훅이 한 일을 레일 사건 기록에 남긴다(2.2판: 부품이 얼마나 쓰이는지 세려고). rail.mjs log 를 불러 같은 잠금을 쓴다.
+// rail.mjs: 설치된 레포에서는 .rail/hooks 옆의 .rail/bin, 레일 저장소 안에서는 hooks 옆의 scripts.
+export const RAIL_BIN = ['bin', 'scripts'].map((d) => path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', d, 'rail.mjs')).find(existsSync) ?? null
+// 자식 명령은 부모가 node --test 안이어도 독립된 실행이어야 한다. 레일을 부를 때는 저장소를 RAIL_ROOT 로 준다.
+export function childEnv(root = null) {
+  const env = { ...process.env, ...(root ? { RAIL_ROOT: root, RAIL_NO_TOUCH: '1' } : {}) }
+  delete env.NODE_TEST_CONTEXT
+  return env
+}
+// 훅이 한 일을 레일 사건 기록에 남긴다(부품이 얼마나 쓰이는지 세려고). rail.mjs log 를 불러 같은 잠금을 쓴다.
 // 레일 저장소(.rail/ 가 있음)일 때만 남기고, 기록이 실패하거나 늦어도 훅의 판정은 바꾸지 않는다.
-const RAIL_BIN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts/rail.mjs')
 export function railLog(root, event, data) {
   try {
-    if (!existsSync(path.join(root, '.rail')) || !existsSync(RAIL_BIN)) return
-    const env = { ...process.env, RAIL_ROOT: root, RAIL_NO_TOUCH: '1' }
-    delete env.NODE_TEST_CONTEXT
-    spawnSync(process.execPath, [RAIL_BIN, 'log', event, JSON.stringify(data)], { env, encoding: 'utf8', timeout: 5000 })
+    if (!existsSync(path.join(root, '.rail')) || !RAIL_BIN) return
+    spawnSync(process.execPath, [RAIL_BIN, 'log', event, JSON.stringify(data)], { env: childEnv(root), encoding: 'utf8', timeout: 5000 })
   } catch {
     // 기록하지 못해도 훅은 하던 대로 한다.
   }

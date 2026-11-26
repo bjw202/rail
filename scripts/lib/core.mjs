@@ -5,12 +5,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BASELINE } from '../../hooks/lib.mjs'
 
-// 플러그인으로 옮긴 뒤: 코드가 프로젝트 밖에 있으므로 저장소는 RAIL_ROOT, 없으면 지금 폴더에서 위로 올라가며 처음 만나는 .rail/ 이 있는 폴더, 그것도 없으면 CLAUDE_PROJECT_DIR·지금 폴더다.
-const up = (d) => (fs.existsSync(path.join(d, '.rail')) ? d : path.dirname(d) === d ? null : up(path.dirname(d)))
-export const ROOT = path.resolve(process.env.RAIL_ROOT || up(process.cwd()) || process.env.CLAUDE_PROJECT_DIR || process.cwd())
-// 플러그인 맨 위 폴더와 사람·작업자에게 알려 주는 레일 명령(절대 경로라 어느 폴더에서도 돈다).
-export const PLUGIN = path.resolve(process.env.CLAUDE_PLUGIN_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..'))
-export const RAIL_CMD = `node "${path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'rail.mjs')}"`
+// 저장소는 RAIL_ROOT, 없으면 이 파일(<저장소>/.rail/bin/lib/core.mjs)에서 세 단계 위다. 레일 명령은 저장소 맨 위에서 부른다.
+export const ROOT = path.resolve(process.env.RAIL_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'))
+export const RAIL_CMD = 'node .rail/bin/rail.mjs'
 export const F = {
   state: path.join(ROOT, '.rail/state.json'),
   log: path.join(ROOT, '.rail/log.jsonl'),
@@ -50,7 +47,7 @@ export function gitIn(args) {
 }
 export const isGitTop = () => {
   const r = gitIn(['rev-parse', '--show-toplevel'])
-  return r.ok && path.resolve(r.out.trim()) === fs.realpathSync(ROOT)
+  return r.ok && path.resolve(r.out.trim()) === fs.realpathSync.native(ROOT)
 }
 export function walk(dir, rel = '') {
   const out = []
@@ -67,7 +64,7 @@ export const fail = (s, code = 1) => {
   process.stderr.write(s + '\n')
   process.exit(code)
 }
-// 2.6판: 답 앞뒤의 따옴표를 걷는다(답 예를 따옴표째 붙여 넣는 일이 있었다). 뒤 따옴표는 앞을 걷었거나 짝이 없을 때만 걷는다.
+// 답 앞뒤의 따옴표를 걷는다(답 예를 따옴표째 붙여 넣는 일이 있었다). 뒤 따옴표는 앞을 걷었거나 짝이 없을 때만 걷는다.
 export function unquote(text) {
   const t = String(text).trim()
   const head = t.replace(/^["'“”‘’]+\s*/, '')

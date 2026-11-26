@@ -39,13 +39,13 @@ export function decideNext({ precheck = false, withBudget = false } = {}) {
   const action = describe(st).next
   const res = { action, stop: null, autonomy: { mode: a.mode, effective: autonomyOn() } }
   const stop = (code, reason) => ((res.stop = res.stop ?? { code, reason }), res)
-  // 2.3판: 멈춤 규칙 넷(human, busy, same_failure, budget)은 부품(stop:<까닭>)이다. 꺼 두면 멈추지 않고 part_disabled 를 남긴다.
+  // 멈춤 규칙 넷(human, busy, same_failure, budget)은 부품(stop:<까닭>)이다. 꺼 두면 멈추지 않고 part_disabled 를 남긴다.
   const rule = (code, reason) => (partOff(`stop:${code}`) ? partSkipped(`stop:${code}`, st, { reason }) : stop(code, reason))
   const cache = stopCheckCache()
   if (st.stage === 'done' && !nextOpenMilestone(st, readSheet())) stop('done', '모든 마일스톤이 닫혔습니다 (기획서 마일스톤 지도에 새 마일스톤이 없습니다)')
   if (st.human_ask) rule('human', `사람의 답을 기다립니다 — "${st.human_ask.q}"`)
   if (brokenScenes(st).length) rule('human', `판정 대기였던 ${brokenScenes(st).join(', ')} 의 장면을 사람이 안 됨으로 판정했습니다. 앞 마일스톤 장면이 깨지면 뒤로 가지 않습니다`)
-  // 2.9판: 레일 기록에서 열린 작업자도 Orca 쪽에서 이미 끝났을 수 있다(worker_done 알림이 리더를 못 깨운 일, M11-7).
+  // 레일 기록에서 열린 작업자도 Orca 쪽에서 이미 끝났을 수 있다(worker_done 알림이 리더를 못 깨운 일, M11-7).
   // 끝난 작업자가 있으면 busy 대신 그 알림을 읽고 이어 가는 것이 할 일이다. orca 가 없거나 실패하면 지금처럼 busy.
   const workers = openWorkers(st, ev)
   const finished = workers.map((w) => ({ w, f: finishedInOrca(w) })).filter((x) => x.f)

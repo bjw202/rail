@@ -1,15 +1,15 @@
 ---
 name: rail
 description: 프로젝트를 레일(기획서→착수 전 결정과 시험→마일스톤→장면 확인)로 진행한다. 사용자가 "/rail", "다음 뭐 해", "어디까지 했지"라고 하거나 새 세션에서 작업을 이어 갈 때 쓴다.
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" *)
+allowed-tools: Bash(node .rail/bin/rail.mjs *)
 ---
 # rail — 진입점
 
-절차의 원본은 이 플러그인의 `scripts/rail.mjs` 하나다. 단계 순서, 관문, 파일 꼴, 질문 문구, 명령 인자는 스크립트가 판정하고 "다음 할 일"(`next`)로 알려 준다. 너는 그것을 그대로 따른다. 이 스킬과 하위 스킬에는 스크립트가 할 수 없는 판단만 있다.
-명령은 프로젝트 최상위 폴더에서 `node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" ...` 로 부른다.
+절차의 원본은 `.rail/bin/rail.mjs` 하나다. 단계 순서, 관문, 파일 꼴, 질문 문구, 명령 인자는 스크립트가 판정하고 "다음 할 일"(`next`)로 알려 준다. 너는 그것을 그대로 따른다. 이 스킬과 하위 스킬에는 스크립트가 할 수 없는 판단만 있다.
+명령은 프로젝트 최상위 폴더에서 `node .rail/bin/rail.mjs ...` 로 부른다.
 
 ## 지금 상태 (자동으로 채워짐)
-!`node "${CLAUDE_PLUGIN_ROOT}/scripts/rail.mjs" status --json`
+!`node .rail/bin/rail.mjs status --json`
 
 ## 입력: $ARGUMENTS
 

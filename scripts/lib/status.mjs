@@ -1,6 +1,6 @@
 // 위치와 "다음 할 일" 문구: status, precompact 명령.
 import { autonomy, autonomyOn, commitPolicy, loadConfig, railVersion, versionLabel } from './config.mjs'
-import { PLUGIN, RAIL_CMD, out, strList, today } from './core.mjs'
+import { RAIL_CMD, out, strList, today } from './core.mjs'
 import { NO_COST } from './budget.mjs'
 import { gradeLine, nextOpenMilestone, openRisks, readSheet, sheetProblems, unplanned } from './docs.mjs'
 import { featureHint } from './check.mjs'
@@ -19,7 +19,6 @@ import { isolated, leftLine, leftWorktrees, wtDir } from './worktree.mjs'
 export const SKILL_OF = { plan: 'rail-plan', decide: 'rail-plan', milestone: 'rail-milestone', check: 'rail-check' }
 
 // ---------- 상태 표시 ----------
-// 2.5판(빼기 판): 스킬 문서에 따로 적던 절차(파일 꼴, 묻는 문구, 작업자 띄우기·닫기, 커밋 관문 차례)를 "다음 할 일" 문구로 옮겼다.
 // 절차의 원본은 이 파일 하나다. 스킬에는 코드가 할 수 없는 판단(인터뷰, 카드 쓰기, 지시서 내용)만 남긴다.
 export const approveHint = (doc, q, what) => `${what} 보여 주고 ask "${q}" --kind approve 로 묻고 턴을 끝내기. "맞음"이면 answer 로 남긴 뒤 ${doc} 맨 위에 "승인: ${today()}" 한 줄을 더한다(사람의 "맞음" 없이 쓰지 않는다)`
 export const roleFlag = (row) => (/마지막\s*리뷰/.test(row.role) ? 'final-review' : isTestRole(row) ? 'test' : isReviewRole(row) ? 'review' : isImplRole(row) ? 'impl' : isFeatureRole(row) ? 'feature' : isFixRole(row) ? 'fix' : null)
@@ -78,7 +77,7 @@ export function describe(st) {
   if (st.stage === 'plan') {
     pos = `기획 · 기획서 (질문 ${st.interview.asked})`
     const sp = sheetProblems(rm)
-    const form = '.rail/plan/template.md(없으면 플러그인 templates/.rail/plan/template.md) 꼴'
+    const form = '.rail/plan/template.md 꼴'
     if (!rm)
       next = `기획 · 인터뷰 — docs/plan/refs/ 가 있으면 먼저 보고, 보여 주고 반응 받기로 한 번에 하나씩 묻습니다(ask "<질문 한 줄>" 로 기록하고 턴을 끝내고, 답이 오면 answer "<답 그대로>", 세 번마다 되짚기). 더 물어서 범위·성공 기준·시작 여부가 바뀔지 한 문장으로 말할 수 없으면 멈추고 ${form}로 docs/PLAN.md 를 쓴다`
     else if (sp.length) next = `기획서 마무리 — ${sp[0]}. ${/승인 날짜/.test(sp[0]) ? approveHint('PLAN.md', '이 기획서대로 갈까요? (맞음 / 고칠 문장)', '맨 위 네 줄·성공 장면·첫날 실패 장면·마일스톤 지도를') : form}`
@@ -168,7 +167,7 @@ export function describe(st) {
 
 
 export function cmdStatus({ flags }) {
-  // 훅으로 불리면 입력의 session_id 를 리더 세션으로 적는다(2.3판). 압축 뒤의 세션 시작은 compact 매처 항목(--compact)이 맡는다.
+  // 훅으로 불리면 입력의 session_id 를 리더 세션으로 적는다. 압축 뒤의 세션 시작은 compact 매처 항목(--compact)이 맡는다.
   const input = flags.hook ? hookInput() : {}
   if (flags.hook) noteLeader(input.session_id, input.session_title)
   if (flags.hook && input.source === 'compact' && !flags.compact) return
@@ -239,7 +238,7 @@ export function cmdPrecompact() {
     `- 열린 사람 질문 (원문 그대로): ${ask ? `"${cut(ask.q, 2000)}" (종류 ${ask.kind}, ${ask.at} 에 물음)` : '없음'}`,
     `- 최근 rail_gap: ${gaps.length ? '' : '없음'}`,
     ...gaps.map((g) => `  - ${g.t} ${g.where ?? ''}: ${cut(g.what ?? g.note ?? '', 400)}`),
-    `요약하지 말 것: CLAUDE.md, docs/RAIL.md, ${PLUGIN}/skills/rail*/ 의 규칙. 파일에 있으니 압축 뒤 다시 읽는다. 규칙을 요약에 옮겨 적지 마라.`,
+    `요약하지 말 것: CLAUDE.md, docs/RAIL.md, .claude/skills/rail*/ 의 규칙. 파일에 있으니 압축 뒤 다시 읽는다. 규칙을 요약에 옮겨 적지 마라.`,
     `압축 뒤 할 일: docs/RAIL.md 와 지금 마일스톤의 step 표를 다시 읽고, ${RAIL_CMD} status 로 진행 중 작업자를 확인한 뒤 이어서 한다.`
   ].join('\n')
   softLog('compact_started', st, { trigger: typeof input.trigger === 'string' ? input.trigger : null, session: input.session_id ?? null })

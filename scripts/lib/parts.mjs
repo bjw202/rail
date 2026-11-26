@@ -5,21 +5,18 @@ import { loadConfig } from './config.mjs'
 import { F, strList } from './core.mjs'
 import { appendLog } from './state.mjs'
 
-// ---------- 덜어내기: 부품 쓰임 세기와 끄기 (2.3판) ----------
+// ---------- 덜어내기: 부품 쓰임 세기와 끄기 ----------
 // 부품 하나하나는 "모델이 혼자 못 한다"는 가정이다. 부품마다 마일스톤별로 작동(돈 횟수)과 막음(실제로 멈추거나 바꾼 횟수)을 사건 기록에서 센다.
 // ran 이 null 인 부품은 막을 때만 기록하므로 작동을 세지 않는다(훅, 멈춤 규칙). 부품을 빼는 것은 사람이 정한다.
 export const gateEv = (e, ...targets) => (e.event === 'gate_passed' || e.event === 'gate_blocked') && targets.includes(e.target)
-// 지운 관문: 2.9판의 step-start 기다리는 step, 표 검사(validate), 시제품 질문 전 기록. M14 뒤의 파일 겹침 거절, 시제품 섞임 막기(부품 proto). 그 예전 사건은 기록에 남지만 세지 않는다.
-// TABLE_HOLD: 예전 표 검사가 붙잡은 줄을 마무리 검사의 막음으로 세지 않으려고 남긴다.
-export const TABLE_HOLD = /^계획 표 검사/
 export const ORDER_TARGETS = ['decide', 'milestone', 'check', 'step-done']
 export const PARTS = [
   // 단계 순서 검사: 지금 단계에서 갈 수 있는 다음 단계만 허용한다. 내용 검사가 없어 꺼도 건너뛸 것이 없으므로 끄지 않는다(fixed).
   { id: 'gate:order', fixed: true, name: '단계 순서 검사 (decide·milestone·check·step-done)', ran: (e) => gateEv(e, ...ORDER_TARGETS), blocked: (e) => e.event === 'gate_blocked' && ORDER_TARGETS.includes(e.target) },
   { id: 'gate:close', name: '관문 close (장면 확인 관문)', ran: (e) => gateEv(e, 'close'), blocked: (e) => e.event === 'gate_blocked' && e.target === 'close' },
   { id: 'feature-check', name: '기능 확인 (확인 기록 없이 기능 step 을 끝내지 않음)', ran: (e) => gateEv(e, 'feature-check'), blocked: (e) => e.event === 'gate_blocked' && e.target === 'feature-check' },
-  { id: 'guard-tests', name: '시험 잠금 훅', ran: null, blocked: (e) => e.event === 'hook_blocked' && e.hook !== 'proto-merge' },
-  { id: 'stop-check', name: '마무리 검사 훅 (붙잡음)', ran: null, blocked: (e) => e.event === 'hook_held' && !TABLE_HOLD.test(e.reason ?? '') },
+  { id: 'guard-tests', name: '시험 잠금 훅', ran: null, blocked: (e) => e.event === 'hook_blocked' },
+  { id: 'stop-check', name: '마무리 검사 훅 (붙잡음)', ran: null, blocked: (e) => e.event === 'hook_held' },
   { id: 'verify', name: '검증기', ran: (e) => e.event === 'verify_run', blocked: (e) => e.event === 'verify_run' && e.ok === false },
   { id: 'rehearsal', name: '장면 리허설 관문', ran: (e) => gateEv(e, 'scene', 'rehearsal-record'), blocked: (e) => e.event === 'gate_blocked' && ['scene', 'rehearsal-record'].includes(e.target) },
   { id: 'commit', name: '커밋 관문', ran: (e) => e.event === 'commit_gate', blocked: (e) => e.event === 'commit_gate' && e.ok === false },
