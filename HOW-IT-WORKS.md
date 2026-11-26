@@ -181,7 +181,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 파일 | 줄 | 하는 일 | 부르는 것 |
 |---|---|---|---|
 | `scripts/rail.mjs` | 69 | 명령 이름을 받아 `lib/` 의 함수로 넘기는 입구입니다. 상태를 고치는 명령은 명령 전체가 잠금을 잡게 하고, 작업 중 표시(`busy`)와 레일 크기 기록을 갱신합니다 | 모든 레일 명령 |
-| `scripts/install.mjs` | 147 | 레포 하나에 레일을 설치하고 업데이트합니다(8절) | `rail-install`, `node scripts/install.mjs <레포>` |
+| `scripts/install.mjs` | 149 | 레포 하나에 레일을 설치하고 업데이트합니다(8절) | `rail-install`, `node scripts/install.mjs <레포>` |
 
 ### `scripts/lib/*.mjs`
 
