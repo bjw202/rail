@@ -48,6 +48,6 @@ export function featureHint(st, row, startHint, after, commit = '') {
     checking: `확인 작업자의 worker_done 이 오면 worker done ${s}-check, 그다음 .rail/check/${s}.json 의 must 를 본다`,
     fix: `고침 step — 확인이 꼭 고칠 것 ${c?.must?.length}건을 냈습니다. 먼저 ${keep}. 그다음 must 목록과 재현 시험 경로를 넣은 .orchestration/${s}-fix-spec.md(완료 기준: node --test '.rail/check/${s}/*.test.mjs' 와 전체 node --test 통과, 재현 시험은 고치지 않고, 고친 뒤 tests/ 의 새 파일로 복사해 검사 명령이 돌게 한다. 같은 것을 보는 시험이 이미 있으면 복사하지 않는다)로 worker start ${s}-fix --agent claude --role fix`,
     fixing: `고침 작업자의 worker_done 이 오면 ${after(`${s}-fix`)} → ${done}`,
-    ready: `확인 끝(must ${c?.must?.length ?? 0}건, nice ${c?.nice?.length ?? 0}건) — ${keep}(이미 했으면 건너뜀). ${c?.must?.length && commit ? `고친 코드: ${commit}(고침 보고에 지도와 다른 구조가 있으면 코드 지도도 함께). ` : ''}그다음 ${done}`
+    ready: `확인 끝(must ${c?.must?.length ?? 0}건, nice ${c?.nice?.length ?? 0}건) — ${keep}(이미 했으면 건너뜀). ${c?.must?.length && commit ? `고친 코드 — ${commit} 고침 보고에 지도와 다른 구조가 있으면 코드 지도도 함께 고친다. ` : ''}그다음 ${done}`
   }[k]
 }

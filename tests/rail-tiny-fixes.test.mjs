@@ -211,7 +211,7 @@ describe('⑦ 고침 작업자를 닫은 뒤', () => {
     const closed = (s) => [line('worker_start', 'M0', { step: s, terminal: 'term_x', dispatch: 'ctx_x' }, 60_000), line('worker_closed', 'M0', { step: s, terminal: 'term_x' })]
     const fixed = repo({ rows, log: [...closed('M0-1'), ...closed('M0-1-check'), ...closed('M0-1-fix')] })
     put(fixed, '.rail/check/M0-1.json', JSON.stringify({ must: [{ what: 'x', repro: 'y' }], nice: [] }))
-    assert.match(status(fixed).next, /확인 끝\(must 1건, nice 0건\) — .*\(이미 했으면 건너뜀\)\. 고친 코드: 커밋 관문: checkCommand 가 통과하고.*\(고침 보고에 지도와 다른 구조가 있으면 코드 지도도 함께\)\. 그다음 step-done M0-1/)
+    assert.match(status(fixed).next, /확인 끝\(must 1건, nice 0건\) — .*\(이미 했으면 건너뜀\)\. 고친 코드 — 커밋 관문: checkCommand 가 통과하고.*로컬 커밋\(푸시 안 함\)\. 고침 보고에 지도와 다른 구조가 있으면 코드 지도도 함께 고친다\. 그다음 step-done M0-1/)
     const clean = repo({ rows, log: [...closed('M0-1'), ...closed('M0-1-check')] })
     put(clean, '.rail/check/M0-1.json', JSON.stringify({ must: [], nice: [] }))
     assert.doesNotMatch(status(clean).next, /고친 코드/)
