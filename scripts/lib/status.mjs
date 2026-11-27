@@ -92,8 +92,8 @@ export function describe(st) {
       next = `기획 · 인터뷰 — docs/plan/refs/ 가 있으면 먼저 보고, 보여 주고 반응 받기로 한 번에 하나씩 묻습니다(ask "<질문 한 줄>" 로 기록하고 턴을 끝내고, 답이 오면 answer "<답 그대로>", 세 번마다 되짚기). 더 물어서 범위·성공 기준·시작 여부가 바뀔지 한 문장으로 말할 수 없으면 멈추고 ${form}로 docs/PLAN.md 를 쓴다`
     else if (sp.length) next = `기획서 마무리 — ${sp[0]}. ${/승인 날짜/.test(sp[0]) ? approveHint('PLAN.md', '이 기획서대로 갈까요? (맞음 / 고칠 문장)', '맨 위 네 줄·성공 장면·첫날 실패 장면·마일스톤 지도를') : form}`
     else {
-      // 승인 직후 한 번(기획 단계는 처음 한 번뿐이다): CLAUDE.md 빈칸(코드 지도 위의 <…>)과 검사 명령.
-      const [blanks, cc] = [(read(F.claude) ?? '').split(/\n## 코드\s*지도/)[0].match(/<[^>\n]+>/g)?.length, loadConfig().checkCommand]
+      // 승인 직후 한 번(기획 단계는 처음 한 번뿐이다): CLAUDE.md 빈칸(코드 지도 위의 띄어쓰기 든 <…>. `<이름>` 같은 명령 인자 표기는 빼려고)과 검사 명령.
+      const [blanks, cc] = [(read(F.claude) ?? '').split(/\n## 코드\s*지도/)[0].match(/<[^>\n]*\s[^>\n]*>/g)?.length, loadConfig().checkCommand]
       next = `기획서가 승인됐습니다. 먼저 ${blanks ? `CLAUDE.md 빈칸 ${blanks}곳(제품 한 줄, 명령, 되돌리기 어려운 일)을 채우고, ` : ''}.rail/config.json 의 checkCommand(${cc ? `지금 "${cc}"` : '비어 있음'})가 제품의 시험 명령인지 본다. 타입 검사(예: tsc --noEmit)·린터가 있으면 함께 넣고 너무 느리면 빠른 것만. 그다음 ${nextOpenMilestone(st, rm)} 착수 전 결정·시험으로 넘어갑니다 (advance decide --milestone ${nextOpenMilestone(st, rm)})`
       skill = 'rail'
     }

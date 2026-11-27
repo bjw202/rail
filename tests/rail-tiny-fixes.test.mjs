@@ -163,9 +163,9 @@ describe('③ 폴더 믿음 화면', () => {
 
 describe('④ 스킬에만 있던 장치를 다음 할 일로', () => {
   test('기획 승인 직후 CLAUDE.md 빈칸과 checkCommand(채워져 있어도 타입 검사·린터)를 한 번 안내한다', () => {
-    const root = repo({ stage: 'plan', milestone: null, config: { checkCommand: 'node --test' }, claude: '# 메모\n- 무엇: <한 줄>\n- 실행 `<명령>`\n\n## 코드 지도\n<M0 을 닫을 때>\n' })
+    const root = repo({ stage: 'plan', milestone: null, config: { checkCommand: 'node --test' }, claude: '# 메모\n- 무엇: <한 줄>\n- 실행 `<띄우는 명령>`\n\n## 코드 지도\n<M0 을 닫을 때>\n' })
     assert.match(status(root).next, /^기획서가 승인됐습니다\. 먼저 CLAUDE\.md 빈칸 2곳\(제품 한 줄, 명령, 되돌리기 어려운 일\)을 채우고, \.rail\/config\.json 의 checkCommand\(지금 "node --test"\)가 제품의 시험 명령인지 본다\. 타입 검사\(예: tsc --noEmit\)·린터가 있으면 함께 넣고/)
-    put(root, 'CLAUDE.md', '# 메모\n- 무엇: 인사 도구\n\n## 코드 지도\n<M0 을 닫을 때>\n')
+    put(root, 'CLAUDE.md', '# 메모\n- 무엇: 인사 도구\n- 실행 `node src/cli.mjs <이름>`\n\n## 코드 지도\n<M0 을 닫을 때>\n')
     assert.doesNotMatch(status(root).next, /빈칸/)
   })
   test('닫기 안내는 코드 지도가 틀 문구면 만들라고, 있으면 고치라고 한다', () => {
