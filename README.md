@@ -146,7 +146,7 @@ node C:\tools\rail\scripts\install.mjs C:\projects\my-app
 | `docs/RAIL.md` | 프로젝트에 두는 한 쪽 사용법 | 새 판으로 바뀜 |
 | `CLAUDE.md` | 모든 세션(리더·작업자)이 처음 읽는 열한 줄짜리 개발 메모 틀. 빈칸 `<…>`(제품 한 줄, 실행·시험·배포 명령, 되돌리기 어려운 일)은 기획서를 승인받은 뒤 리더가 채웁니다 | 있으면 건드리지 않음. 이미 `CLAUDE.md` 가 있던 레포는 처음 설치 때도 그대로 |
 | `.gitignore` | 레일 기록 중 git 에 넣지 않을 줄 | 없는 줄만 더함 |
-| `.rail/installed.json` | 설치한 레일 커밋, 커밋 안 된 변경이 있었는지, 설치한 파일 목록 | 새로 씀 |
+| `.rail/installed.json` | 설치한 레일 커밋, 커밋 안 된 변경이 있었는지, 설치한 파일 목록. `status` 첫 줄과 훅 머리의 "레일 <커밋>"(커밋 안 된 변경이 있었으면 "고친 판")이 이 커밋입니다 | 새로 씀 |
 
 설치는 상태·기록·기획서(`.rail/state.json`, `.rail/log.jsonl`, `docs/PLAN.md`, `docs/plan/` 등)와 이미 있는 `CLAUDE.md` 를 절대 덮지 않습니다. `.rail/` 과 `.claude/` 는 커밋해 두세요. 그래야 다른 컴퓨터에서 레포를 받아도 같은 레일이 돕니다.
 
@@ -229,7 +229,6 @@ cd C:\projects\my-app; rail-install
 
 | 칸 | 뜻 | 기본 |
 |---|---|---|
-| `railVersion` | 레일 판 이름표. `status` 첫 줄과 훅 머리에 보입니다. 동작은 바꾸지 않습니다 | 틀에는 `"2.9"` |
 | `checkCommand` | 마무리 검사 훅이 돌리는 시험 명령. 리더도 커밋 전에 이것이 통과하는지 봅니다. 비면 마무리 검사를 건너뜁니다 | 틀에는 `"node --test"` |
 | `verify` | 바깥 정답 검증기 목록 `[{ "name", "command", "why", "timeoutSec" }]`. 종료 코드 0 통과, 3 건너뜀, 그 밖은 실패. `timeoutSec` 은 하나당 시간 상한 | `[]`, `timeoutSec` 은 900초 |
 | `appStart` | 확인·리허설 작업자가 앱을 띄우는 명령. 레일 코드는 읽지 않고 작업자 지시서가 이 명령을 쓰라고 합니다 | `""` |
@@ -238,7 +237,7 @@ cd C:\projects\my-app; rail-install
 | `worktreeDir` | worktree 를 만들 폴더 | `~/orca/workspaces/<레포 폴더 이름>` |
 | `codexRoles` | Codex 로 띄울 역할 | `["final-review"]` |
 | `workerModels` | 작업자 역할별 Claude 모델. 예 `{"default": "opus", "check": "sonnet"}`. 역할 → `default` → `opus` 순으로 찾습니다. Codex 작업자에는 쓰지 않습니다 | 없음(모두 `opus`) |
-| `staleTests` | 잠긴 시험을 고쳐야 할 때 판정을 사람(`human`)이 할지 판정 작업자(`agent`)가 할지. `agent` 여도 한 마일스톤에 시험 파일 5개를 넘으면 사람에게 묻습니다 | `human` |
+| `staleTests` | 잠긴 시험을 고쳐야 할 때 판정을 사람(`human`)이 할지 판정 작업자(`agent`)가 할지. `agent` 여도 한 마일스톤에 시험 파일 5개를 넘으면 사람에게 묻습니다. 어느 쪽이든 확인 작업자의 must 가 이번 마일스톤에 새로 생긴 시험 파일을 가리키면 고침 작업자 하나에 묻지 않고 허락합니다. 사람에게 물을 때는 "네·맞음" 같은 답, 또는 질문에 적은 보기 가운데 "시험 고치"가 든 보기의 기호(A 등) 답이 허락입니다 | `human` |
 | `notify.bot` | 마일스톤 닫힘·폭주 알림을 보낼 Orca 봇 이름 | 없음(안 보냄) |
 | `insurance` | 보험 부품(끄지 않고 빼기 후보에도 올리지 않음). 순서 검사 `gate:order` 는 여기 없어도 끄지 않고 후보에 올리지 않습니다 | `["guard-tests", "stop-check", "gate:close"]` |
 | `disabled` | 한 마일스톤 동안 꺼 둔 부품. 닫으면 다시 켜집니다 | `[]` |
