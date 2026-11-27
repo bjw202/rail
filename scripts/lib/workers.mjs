@@ -1,12 +1,12 @@
 // 작업자 띄우기와 닫기, 열린 작업자 읽기.
 import fs from 'node:fs'
 import path from 'node:path'
-import { ROOT, fail, lastLines, out, read, unquote } from './core.mjs'
-import { workerModel } from './config.mjs'
+import { ROOT, WIN, fail, lastLines, out, read, unquote } from './core.mjs'
+import { autonomyOn, workerModel } from './config.mjs'
 import { isSettled, orca } from './orca.mjs'
 import { isActive, isDone, readPlan } from './plan.mjs'
 import { staleGrant } from './stale.mjs'
-import { appendLog, loadState, readEvents, withLock } from './state.mjs'
+import { appendLog, loadState, readEvents, sleepMs, withLock } from './state.mjs'
 import { createWorktree, isolated, leftWorktrees, mergeWorktree, removeWorktree } from './worktree.mjs'
 
 
@@ -65,7 +65,6 @@ export function chooseSplit(layout, leader, workerTerms) {
   const target = shallow.find((l) => l.handle !== leader) ?? shallow[0]
   return { handle: target.handle, direction: target.dir === 'vertical' ? 'horizontal' : 'vertical' }
 }
-const WIN = process.platform === 'win32'
 // Orca 창에 넣는 작업자 명령. 셸 문법이 다르므로 Windows 는 PowerShell(5.1·7), 그 밖은 sh 계열(bash·zsh)로 쓴다.
 // 작업자는 무인 진행을 위해 권한 확인을 끄고 뜬다(README "안전장치").
 export const shq = (s, win = WIN) => (win ? `'${String(s).replace(/'/g, "''")}'` : `'${String(s).replace(/'/g, `'\\''`)}'`)
@@ -160,25 +159,35 @@ export function workerStart(steps, flags, usage) {
       const terms = new Set(openWorkers(st).map((w) => w.terminal).filter(Boolean))
       const layout = orca(['terminal', 'list', '--worktree', 'current', '--include-visual-layouts', '--json'], 30_000)
       const pick = layout.ok ? chooseSplit(layout.json, leader, terms) : { create: true }
-      if (pick.create) {
+      const tab = (how = '새 탭') => {
         const r = orca(['terminal', 'create', '--worktree', 'current', '--title', p.name, '--command', cmd, '--json'])
-        return { r, handle: findIn(r.json, 'handle', /^term_/), how: '새 탭', tab: true }
+        return { r, handle: findIn(r.json, 'handle', /^term_/), how, tab: true }
       }
+      if (pick.create) return tab()
       const base = ['terminal', 'split', '--terminal', pick.handle, '--direction', pick.direction, '--command', cmd, '--json']
       let r = orca(base)
-      // 시간 초과는 실패가 아니다. 오류에 나온 --retry-split <leafId> 로 같은 창을 기다린다. 새로 나누지 않는다.
-      for (let i = 0; !r.ok && i < 2; i++) {
-        const leaf = r.text.match(/--retry-split\s+([\w-]+)/)?.[1]
-        if (!leaf) break
-        r = orca([...base, '--retry-split', leaf])
+      // 시간 초과는 실패가 아니다. 오류의 --retry-split <leafId>(없으면 "pane <leafId> in tab")로 같은 창을 기다린다. 새로 나누지 않는다.
+      const leaf = r.text.match(/--retry-split\s+([\w-]+)/)?.[1] ?? r.text.match(/pane\s+([\w-]+)\s+in tab/)?.[1]
+      for (let i = 0; !r.ok && leaf && i < 2; i++) r = orca([...base, '--retry-split', leaf])
+      if (r.ok) return { r, handle: findIn(r.json, 'handle', /^term_/), how: `${pick.handle} 를 ${pick.direction === 'vertical' ? '좌우' : '위아래'}로 나눔` }
+      // 끝내 나누지 못하면 그 사이 생긴 창(그 leafId 의 창, leafId 를 모르면 목록에 새로 생긴 창이 하나일 때 그 창)을 닫고,
+      // 새 탭(--leader none 과 같은 길)으로 한 번 다시 띄운다. 창이 늦게 열릴 수 있어 leafId 를 알면 3초씩 두 번 더 찾는다.
+      const before = new Set((layout.json?.result?.terminals ?? []).map((x) => x.handle))
+      let orphans = []
+      for (let i = 0; i < (leaf ? 3 : 1) && !orphans.length; i++) {
+        if (i) sleepMs(3000)
+        const rows = (orca(['terminal', 'list', '--worktree', 'current', '--json'], 30_000).json?.result?.terminals ?? []).filter((x) => typeof x.handle === 'string' && !before.has(x.handle) && !terms.has(x.handle))
+        orphans = rows.some((x) => leaf && x.leafId === leaf) ? rows.filter((x) => x.leafId === leaf) : rows.length === 1 ? rows : []
       }
-      return { r, handle: findIn(r.json, 'handle', /^term_/), how: `${pick.handle} 를 ${pick.direction === 'vertical' ? '좌우' : '위아래'}로 나눔` }
+      const closed = orphans.filter((x) => orca(['terminal', 'close', '--terminal', x.handle, '--json'], 30_000).ok).map((x) => x.handle)
+      const note = `리더 탭 나누기 실패(${r.error}), 그 사이 생긴 창 ${closed.length ? `${closed.join(', ')} 닫음` : leaf ? `못 찾음(leafId ${leaf}: 늦게 열리면 orca terminal list 로 찾아 닫는다)` : '없음'}`
+      return { ...tab(`새 탭 — ${note}`), splitError: r.error }
     })
     if (!made.r.ok || !made.handle) {
       failed++
       undo()
-      appendLog('worker_start_failed', loadState(), { step: p.step, agent, role, stage_failed: 'split', error: made.r.error ?? '새 창 핸들이 없습니다' })
-      out(`[작업자 실패] ${p.step}: 창을 열지 못했습니다 (${made.r.error ?? '새 창 핸들이 없습니다'}).`)
+      appendLog('worker_start_failed', loadState(), { step: p.step, agent, role, stage_failed: 'split', error: made.r.error ?? '새 창 핸들이 없습니다', ...(made.splitError ? { split_error: made.splitError } : {}) })
+      out(`[작업자 실패] ${p.step}: 창을 열지 못했습니다 (${made.r.error ?? '새 창 핸들이 없습니다'}${made.splitError ? ` · ${made.how}` : ''}).`)
       continue
     }
     const term = made.handle
@@ -186,6 +195,18 @@ export function workerStart(steps, flags, usage) {
     const wait = orca(['terminal', 'wait', '--terminal', term, '--for', 'tui-idle', '--timeout-ms', '60000', '--json'], 75_000)
     // 업데이트를 묻는 화면에서 멈추면 Esc 로 건너뛴다. 업데이트는 사람이 따로 한다.
     if (/agent-update-prompt/.test(wait.text)) orca(['terminal', 'send', '--terminal', term, '--text', '\x1b', '--json'], 30_000)
+    // "이 폴더를 믿습니까?" 화면(Orca tui-idle 결과의 blockedReason agent-trust-workspace·codex-trust-workspace)이면 일을 맡기지 않고 실패로 적는다.
+    // 믿음은 보안 결정이라 레일이 고르지 않는다. 사람이 있으면(자율 아님, worktree 아님) 그 창을 남겨 거기서 고르게 하고, 아니면 닫는다.
+    const trust = wait.text.match(/[\w-]*trust-workspace/)?.[0]
+    if (trust) {
+      const keep = !autonomyOn() && !wt
+      const c = keep ? null : orca(['terminal', 'close', '--terminal', term, '--json'], 30_000)
+      failed++
+      undo()
+      appendLog('worker_start_failed', loadState(), { step: p.step, agent, role, terminal: term, stage_failed: 'trust', error: trust, pane_closed: c?.ok ?? false })
+      out(`[작업자 실패] ${p.step}: 작업자 창 ${term} 이 "이 폴더를 믿습니까?" 화면에 멈췄습니다 (Orca: ${trust}). 레일은 믿음을 대신 고르지 않습니다. ${keep ? `주인이 그 창에서 믿음을 고른 뒤 창을 닫고(orca terminal close --terminal ${term}) 다시 worker start 하거나, ` : `창은 ${c.ok ? '닫았습니다' : `닫지 못했습니다(${c.error})`}. `}주인이 리더 Claude 를 그 폴더(${wt?.worktree ?? ROOT})에서 한 번 열어 믿게 한 뒤 다시 worker start 합니다. 주인에게 이 줄을 그대로 전한다.`)
+      continue
+    }
     const ws = orca(['orchestration', 'worker-start', '--spec-file', p.spec, '--terminal', term, '--worktree', 'current', '--task-title', p.name, '--json'], 120_000)
     const dispatch = findIn(ws.json, 'dispatchId', /^ctx_/)
     if (!ws.ok || !dispatch) {

@@ -53,7 +53,8 @@ describe('지금 사실과 코드 지도 (지침·틀 문장)', () => {
   })
   test('코드 지도: 틀의 빈칸, 닫을 때 고치기(없으면 만들기), 작업자는 먼저 읽고, 마지막 리뷰는 맞는지 본다', () => {
     assert.match(read('templates/CLAUDE.md'), /^## 코드 지도\n<M0 을 닫을 때 만든 코드를 있는 그대로 적는다/m)
-    assert.match(read('skills/rail-check/SKILL.md'), /"## 코드 지도" 를 이번까지 만든 코드에 맞게 고친다\. 절이 없거나 비었으면 이때 만든다/)
+    // 닫을 때 고치기(없으면 만들기)는 이제 닫기 안내가 말한다(rail-tiny-fixes 시험). 스킬은 판단만 남긴다.
+    assert.match(read('skills/rail-check/SKILL.md'), /코드 지도는 있는 코드 그대로 쓰고 미리 설계하지 않는다\(꼴은 닫기 안내에 있다\)/)
     const w = read('skills/rail-milestone/workers.md')
     assert.match(w, /`CLAUDE\.md` 의 코드 지도를 먼저 읽고, 지도와 다른 구조.*보고에 적어라/)
     assert.match(w, /기획서의 지금 사실\(맨 위 네 줄·화면·바뀐 결정 표시\)과 `CLAUDE\.md` 의 코드 지도가 이번 변경과 맞는지 본다/)

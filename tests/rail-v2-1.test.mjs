@@ -19,7 +19,7 @@ test('남은 마일스톤이 없으면 done 에서 decide 로 가지 않는다',
   assert.match(r.err + r.out, /시작할 마일스톤이 남아 있지 않습니다/)
   const st = JSON.parse(rail(root, 'status', '--json').out)
   assert.match(st.next, /^남은 일이 없습니다\. 주인이 기능을 더하자고 하면: 기획서의 관련 장면·결정\(다시 볼 조건\)·깨진 가정·"## 나중에"·확인 기록\(\.rail\/check\/\*\.json\)의 nice 를 읽고, 그 기능이 닿는 지금 코드와 시험을 확인한다/)
-  assert.match(st.next, /지금 되는 것과 바뀔 것을 짧게 보여 주고 같은 기획서\(맨 위 네 줄·장면·화면·지도\)를 고친 뒤 고친 줄을 보여 주고 ask "이렇게 고친 기획서대로 갈까요\? \(맞음 \/ 고칠 문장\)" --kind approve/)
+  assert.match(st.next, /지금 되는 것과 바뀔 것을 짧게 보여 주고 같은 기획서를 지금 사실로 고친다\(장면 채우기, 맨 위 네 줄·화면 다시 쓰기, 지도 줄, 바뀐 옛 결정은 "결정: 바뀜 \(→ D-xx\)"\)\. 그 뒤 고친 줄을 보여 주고 ask "이렇게 고친 기획서대로 갈까요\? \(맞음 \/ 고칠 문장\)" --kind approve/)
   assert.match(st.next, /맨 위 승인 줄을 "승인: \d{4}-\d\d-\d\d" 로 둔다\(없으면 더하고 있으면 날짜를 바꾼다/, '이미 있는 옛 승인 줄은 날짜를 오늘로 바꾼다')
   assert.equal(st.skill, 'rail-plan')
 })

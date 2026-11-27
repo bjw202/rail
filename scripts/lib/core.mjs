@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BASELINE } from '../../hooks/lib.mjs'
+import { BASELINE, WIN, childEnv } from '../../hooks/lib.mjs'
 
 // 저장소는 RAIL_ROOT, 없으면 이 파일(<저장소>/.rail/bin/lib/core.mjs)에서 세 단계 위다. 레일 명령은 저장소 맨 위에서 부른다.
 export const ROOT = path.resolve(process.env.RAIL_ROOT || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..'))
@@ -12,6 +12,7 @@ export const F = {
   state: path.join(ROOT, '.rail/state.json'),
   log: path.join(ROOT, '.rail/log.jsonl'),
   sheet: path.join(ROOT, 'docs/PLAN.md'),
+  claude: path.join(ROOT, 'CLAUDE.md'),
   decisions: path.join(ROOT, 'docs/decisions'),
   plan: path.join(ROOT, 'docs/plan'),
   config: path.join(ROOT, '.rail/config.json'),
@@ -28,12 +29,8 @@ export const today = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-// 자식 명령은 부모가 node --test 안이어도 독립된 실행이어야 한다.
-export const childEnv = () => {
-  const env = { ...process.env }
-  delete env.NODE_TEST_CONTEXT
-  return env
-}
+// 자식 명령의 환경(node --test 밖처럼)과 Windows 여부는 훅과 같은 것을 쓴다(hooks/lib.mjs).
+export { WIN, childEnv }
 export const lastLines = (text, n) =>
   String(text ?? '')
     .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')

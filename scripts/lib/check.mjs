@@ -33,8 +33,9 @@ export function featureProblems(st, row) {
   const fixed = readEvents().some((e) => e.milestone === st.milestone && e.event === 'worker_closed' && e.step === `${row.step}-fix`)
   return c.must.length && !fixed ? [`${row.step} 의 확인이 꼭 고칠 것 ${c.must.length}건을 냈는데 고침 작업자 ${row.step}-fix 가 끝나지 않았습니다`] : []
 }
-// after(step): 작업자가 끝난 뒤의 차례(status 의 afterWorker — worker done 과 커밋 관문, worktree 방식이면 순서가 바뀐다)
-export function featureHint(st, row, startHint, after) {
+// after(step): 작업자가 끝난 뒤의 차례(status 의 afterWorker — worker done 과 커밋 관문, worktree 방식이면 순서가 바뀐다).
+// commit: 고침 작업자를 닫은 뒤 고친 코드의 커밋 관문(worktree 방식이면 worker done 이 이미 합쳐 빈 글).
+export function featureHint(st, row, startHint, after, commit = '') {
   const s = row.step
   const { k, c } = featureState(st, row)
   const checkSpec = `.rail/check/template.md 의 빈칸만 채워(기능·완료 기준은 표의 ${s} 줄 그대로, 마일스톤 목표는 기획서의 그 마일스톤 성공 장면, 바뀐 파일은 이 기능 커밋의 git show --stat. 만든 작업자의 대화·보고서 해석은 넣지 않는다) .orchestration/${s}-check-spec.md 로 쓰고 worker start ${s}-check --agent claude --role check`
@@ -43,10 +44,10 @@ export function featureHint(st, row, startHint, after) {
   return {
     build: `${startHint}. 그다음 작업자의 worker_done 이 오면 ${after(s)} → 확인 step`,
     building: `작업자의 worker_done 이 오면 ${after(s)} → 확인 step`,
-    check: `확인 step — ${c?.error ? `${c.error}. ` : ''}${checkSpec}`,
+    check: `확인 step — ${c?.error ? `${c.error}. ` : '만든 작업자의 보고에 코드 지도와 다른 구조(새 폴더·모듈, 다른 자료 길)가 있으면 CLAUDE.md "## 코드 지도" 그 줄을 고쳐 이 기능 커밋에 함께 넣는다(리더만 고친다). '}${checkSpec}`,
     checking: `확인 작업자의 worker_done 이 오면 worker done ${s}-check, 그다음 .rail/check/${s}.json 의 must 를 본다`,
     fix: `고침 step — 확인이 꼭 고칠 것 ${c?.must?.length}건을 냈습니다. 먼저 ${keep}. 그다음 must 목록과 재현 시험 경로를 넣은 .orchestration/${s}-fix-spec.md(완료 기준: node --test '.rail/check/${s}/*.test.mjs' 와 전체 node --test 통과, 재현 시험은 고치지 않고, 고친 뒤 tests/ 의 새 파일로 복사해 검사 명령이 돌게 한다. 같은 것을 보는 시험이 이미 있으면 복사하지 않는다)로 worker start ${s}-fix --agent claude --role fix`,
     fixing: `고침 작업자의 worker_done 이 오면 ${after(`${s}-fix`)} → ${done}`,
-    ready: `확인 끝(must ${c?.must?.length ?? 0}건, nice ${c?.nice?.length ?? 0}건) — ${keep}(이미 했으면 건너뜀). 그다음 ${done}`
+    ready: `확인 끝(must ${c?.must?.length ?? 0}건, nice ${c?.nice?.length ?? 0}건) — ${keep}(이미 했으면 건너뜀). ${c?.must?.length && commit ? `고친 코드: ${commit}(고침 보고에 지도와 다른 구조가 있으면 코드 지도도 함께). ` : ''}그다음 ${done}`
   }[k]
 }

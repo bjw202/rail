@@ -1,6 +1,6 @@
 // 관문 판정: 단계 순서 검사(gate:order), 장면 관문(gate:close), step 시작·끝(stepGate).
 import { fail } from './core.mjs'
-import { nextOpenMilestone, openRisks, readSheet } from './docs.mjs'
+import { nextOpenMilestone, readSheet, startProblems } from './docs.mjs'
 import { partOff, partSkipped } from './parts.mjs'
 import { isDone, readPlan, stepsDoneProblems } from './plan.mjs'
 import { pendingClose } from './queue.mjs'
@@ -12,7 +12,7 @@ import { leftWorktrees } from './worktree.mjs'
 // 기획서 판: 브리프·로드맵 두 단계를 기획(plan) 한 단계로 합쳤다.
 export const NEXT_OF = { plan: 'decide', decide: 'milestone', milestone: 'check', check: 'close', done: 'decide' }
 
-// 단계 관문은 순서를 보고, 마일스톤 시작 때만 착수 전 결정·시험이 풀렸는지 본다(미리 승인과 같은 판정, docs.mjs openRisks).
+// 단계 관문은 순서를 보고, 마일스톤 시작 때만 장면이 채워졌고 착수 전 결정·시험이 풀렸는지 본다(미리 승인과 같은 판정, docs.mjs startProblems).
 // 기획서 형식·승인 날짜와 step 표는 status 의 "다음 할 일"이 알려 준다. close 는 장면 관문(gate:close, 보험)이다.
 const ORDER = {
   decide: (st, rm, opts) => {
@@ -25,7 +25,7 @@ const ORDER = {
   milestone: (st, rm, opts) => [
     ...(opts.milestone && opts.milestone !== st.milestone ? [`지금 시작 전 마일스톤은 ${st.milestone} 입니다 (${opts.milestone} 아님)`] : []),
     ...(rm?.ms.some((x) => x.id === st.milestone) ? [] : [`기획서 마일스톤 지도에 ${st.milestone ?? '해당 마일스톤'} 이(가) 없습니다`]),
-    ...openRisks(st.milestone, rm).map((d) => `착수 전 ${d.id} 가 풀리지 않았습니다 (${d.why})`)
+    ...startProblems(st.milestone, rm)
   ],
   // 머리줄만 있는 빈 step 표를 "모두 끝남"으로 넘기지 않는다. 표가 아예 없을 때는 보지 않는다.
   check: (st) => (readPlan(st.milestone)?.rows.length === 0 ? [`docs/plan/${st.milestone}.md 에 step 줄이 없습니다 (step 표를 먼저 채우세요)`] : [])

@@ -151,7 +151,7 @@ describe('① 기능 단위: 기능 작업자 뒤 확인 step', () => {
   test('기능 작업자가 닫히면 다음 할 일이 확인 step 이고, 확인 기록 없이는 step-done 을 거절한다', () => {
     const root = repo({ log: [startedAs('M0-1'), closed('M0-1')] })
     const next = status(root).next
-    assert.match(next, /확인 step — .rail\/check\/template\.md 의 빈칸만 채워/)
+    assert.match(next, /확인 step — 만든 작업자의 보고에 코드 지도와 다른 구조\(새 폴더·모듈, 다른 자료 길\)가 있으면 CLAUDE\.md "## 코드 지도" 그 줄을 고쳐 이 기능 커밋에 함께 넣는다\(리더만 고친다\)\. \.rail\/check\/template\.md 의 빈칸만 채워/)
     assert.match(next, /만든 작업자의 대화·보고서 해석은 넣지 않는다/)
     assert.match(next, /worker start M0-1-check --agent claude --role check/)
     const r = run(root, ['step-done', 'M0-1', '--note', '됨'])

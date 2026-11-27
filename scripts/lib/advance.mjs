@@ -2,7 +2,7 @@
 import { loadConfig } from './config.mjs'
 import { fail, now, out } from './core.mjs'
 import { orca } from './orca.mjs'
-import { gradeLine, markClosed, nextOpenMilestone, readSheet, unplanned } from './docs.mjs'
+import { draftScenes, gradeLine, livingMark, markClosed, nextOpenMilestone, readSheet, unplanned } from './docs.mjs'
 import { gate } from './gates.mjs'
 import { staleList, withCommit } from './stale.mjs'
 import { disabledParts } from './parts.mjs'
@@ -62,7 +62,9 @@ export function cmdCheck({ pos, flags }, advance) {
   }
   st.waiting_for = 'none'
   saveState(st)
-  appendLog('stage_advance', st, { from, to: st.stage })
+  // 장면 확인으로 갈 때 "살아 있는 세 줄"의 지문을, 닫고 다음 마일스톤 장면이 자리표시면 그 번호를 남긴다(status 가 닫기·다시 승인 안내에 읽는다).
+  const draft = closedId && st.milestone ? draftScenes(st.milestone, rm) : []
+  appendLog('stage_advance', st, { from, to: st.stage, ...(target === 'check' ? { living: livingMark(rm) } : {}), ...(draft.length ? { replan: draft } : {}) })
   out(`[관문] 통과. 단계: ${from} → ${st.stage}${st.milestone ? ` (${st.milestone})` : ''}`)
   if (closedId) notifyClosed(st, closedId, offAtClose)
   if (closedId) afterClose(st, closedId, offAtClose)

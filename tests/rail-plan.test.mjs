@@ -18,7 +18,7 @@ describe('기획 단계: 기획서 한 장', () => {
     put(root, 'docs/PLAN.md', planDoc(undefined, {}, false))
     assert.match(next(root), /승인 날짜가 없습니다.*ask "이 기획서대로 갈까요\? \(맞음 \/ 고칠 문장\)" --kind approve/)
     put(root, 'docs/PLAN.md', planDoc())
-    assert.match(next(root), /^기획서가 승인됐습니다\. M0 착수 전 결정·시험으로 넘어갑니다 \(advance decide --milestone M0\)/)
+    assert.match(next(root), /^기획서가 승인됐습니다\. 먼저 \.rail\/config\.json 의 checkCommand\(비어 있음\)가 제품의 시험 명령인지 본다\. 타입 검사\(예: tsc --noEmit\)·린터가 있으면 함께 넣고 너무 느리면 빠른 것만\. 그다음 M0 착수 전 결정·시험으로 넘어갑니다 \(advance decide --milestone M0\)/)
     assert.equal(rail(root, 'advance', 'decide', '--milestone', 'M0').code, 0)
     assert.deepEqual([state(root).stage, state(root).milestone], ['decide', 'M0'])
     assert.ok(!('sheet_approved' in state(root).gates), '아무도 읽지 않는 승인 날짜 사본은 상태에 남기지 않는다(원본은 기획서의 승인 줄)')
@@ -79,10 +79,10 @@ describe('살아 있는 세 줄과 계획 밖 결정 수', () => {
   }
   test('닫기 전에 코드가 센 수로 세 줄을 고치라고 알리고, 고친 뒤에는 바로 닫기를 안내한다(관문은 아니다)', () => {
     const old = closing('## 살아 있는 세 줄\n- 깨진 가정: 없음\n- 계획 밖 결정: 아직 없음 · 계획 변경: 없음\n- 다음 장면: S1\n')
-    assert.match(next(old), /^M0 를 닫습니다 — 먼저 기획서 "## 살아 있는 세 줄"을 M0 기준으로 고친다\(.*- 계획 밖 결정: 누적 2번 \(M0 2\).*"## 나중에" 도 본다\. 그다음 advance close/)
+    assert.match(next(old), /^M0 를 닫습니다 — 먼저 기획서 "## 살아 있는 세 줄"을 M0 기준으로 고친다\(.*- 계획 밖 결정: 누적 2번 \(M0 2\).*"## 나중에" 도 본다\. CLAUDE\.md "## 코드 지도" 를 이번까지 만든 코드에 맞게 만든다\(.*\)\. 그다음 advance close/)
     assert.match(rail(old, 'status').out, /\n기획 성적: 계획 밖 결정 이번\(M0\) 2 · 누적 2 \(코드가 셈\)\n/)
     const now = closing('## 살아 있는 세 줄\n- 깨진 가정: 없음 (M0)\n- 계획 밖 결정: 2번 (M0 2) · 계획 변경: M1 을 둘로 나눔\n- 다음 장면: S2 목록이 보인다\n')
-    assert.match(next(now), /^M0 를 닫습니다 — advance close\./)
+    assert.match(next(now), /^M0 를 닫습니다 — 먼저 CLAUDE\.md "## 코드 지도" 를 이번까지 만든 코드에 맞게 만든다\(폴더·모듈마다 맡은 일 한 줄, 자료 길 하나, 깨면 안 되는 약속, 15줄 안쪽, 까닭은 결정 번호만\)\. 그다음 advance close\./)
     const r = rail(now, 'advance', 'close')
     assert.equal(r.code, 0)
     assert.match(r.out, /\[기획 성적\] 계획 밖 결정 이번\(M0\) 2 · 누적 2 \(코드가 셈\)/)

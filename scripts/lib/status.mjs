@@ -1,8 +1,8 @@
 // 위치와 "다음 할 일" 문구: status, precompact 명령.
 import { autonomy, autonomyOn, commitPolicy, loadConfig, railVersion, versionLabel } from './config.mjs'
-import { RAIL_CMD, out, strList, today } from './core.mjs'
+import { F, RAIL_CMD, out, read, strList, today } from './core.mjs'
 import { NO_COST } from './budget.mjs'
-import { gradeLine, nextOpenMilestone, openRisks, readSheet, sheetProblems, unplanned } from './docs.mjs'
+import { draftScenes, gradeLine, livingMark, nextOpenMilestone, openRisks, readSheet, section, sheetProblems, unplanned } from './docs.mjs'
 import { featureHint } from './check.mjs'
 import { disabledParts, partOff } from './parts.mjs'
 import { activeRows, isActive, isDone, isFeatureRole, isFixRole, isImplRole, isReviewRole, isTestRole, planProblems, planViolations, readPlan, startable, stepList } from './plan.mjs'
@@ -48,13 +48,23 @@ export function cardHint(d, m, st) {
   if (st.human_ask) return after
   return `기획서 ${id} 줄 아래에 후보 2~3개(하나는 가장 단순한 안, 후보마다 결과와 깨지는 장면 한 줄)와 추천을 붙여 보이고 ask "${id} 는 A/B/C 중 무엇으로 할까요? (추천대로도 됩니다)" --kind decide 로 묻고 턴을 끝내기. 봐야 아는 결정이면 먼저 docs/decisions/${id}-<이름>.md 시제품 카드("# ${id} (질문 제목)" / "마일스톤: ${m}" / "시제품: 예" / "## 질문" / "## 변주"(- p1-이름: 한두 줄, 2~3개) / "## 스크린샷"(- d-1124.png: 2026-11-24, 데스크톱 폭 1280))를 쓰고 /rail 을 다시 본다. ${after}`
 }
-// 닫기 전 기획서 "## 살아 있는 세 줄"을 이 마일스톤으로 고쳤는가(줄에 Mx 가 있는가). 관문은 아니고 다음 할 일만 알려 준다.
-// 계획 밖 결정 수는 코드가 센 값(docs.mjs unplanned)을 적게 한다.
-const livingHint = (sh, m, st) => {
-  if (new RegExp(`\\b${m}\\b`).test(sh?.living.join('\n') ?? '')) return ''
+// 닫기 전에 할 것: 기획서 "## 살아 있는 세 줄"을 이 마일스톤 동안 고치지 않았으면 고치기(장면 확인으로 갈 때 남긴 지문과 같으면 안 고친 것,
+// 지문이 없는 옛 기록이면 줄에 Mx 가 있는지 본다), CLAUDE.md 코드 지도 맞추기. 관문은 아니고 다음 할 일만 알려 준다. 계획 밖 결정 수는 코드가 센 값(docs.mjs unplanned)을 적게 한다.
+const beforeClose = (sh, m, st) => {
+  const mark = readEvents().findLast((e) => e.event === 'stage_advance' && e.to === 'check' && e.milestone === m)?.living
   const g = unplanned(st, sh)
-  return `먼저 기획서 "## 살아 있는 세 줄"을 ${m} 기준으로 고친다(- 깨진 가정: / - 계획 밖 결정: ${g?.id === m ? `누적 ${g.total}번 (${m} ${g.now})` : `<누적 N번> (${m} <이번 수>)`} · 계획 변경: / - 다음 장면:). "## 나중에" 도 본다. 그다음 `
+  const living = (mark ? mark !== livingMark(sh) : new RegExp(`\\b${m}\\b`).test(sh?.living.join('\n') ?? '')) ? '' : `기획서 "## 살아 있는 세 줄"을 ${m} 기준으로 고친다(- 깨진 가정: / - 계획 밖 결정: ${g?.id === m ? `누적 ${g.total}번 (${m} ${g.now})` : `<누적 N번> (${m} <이번 수>)`} · 계획 변경: / - 다음 장면:). "## 나중에" 도 본다. `
+  const map = section(read(F.claude) ?? '', /코드\s*지도/).join('\n')
+  return `먼저 ${living}CLAUDE.md "## 코드 지도" 를 이번까지 만든 코드에 맞게 ${!map.trim() || /<[^>]+>/.test(map) ? '만든다' : '고친다'}(폴더·모듈마다 맡은 일 한 줄, 자료 길 하나, 깨면 안 되는 약속, 15줄 안쪽, 까닭은 결정 번호만). 그다음 `
 }
+// 표 승인 질문. 기획서의 "- 걸리는 시험: <파일> — …" 파일이 표의 어느 줄 "고쳐도 되는 파일" 안이면 그 step 의 시험 고치기 허락을 같은 질문에 묶는다.
+const lockedTests = (rm) => (rm?.scenes ?? []).flatMap((s) => s.body.map((l) => l.match(/^\s*[-*]\s*걸리는\s*시험\s*[:：]\s*`?([^\s`,]+)/)?.[1]).filter(Boolean))
+export function startQ(rows, rm) {
+  const by = rows.map((r) => [r.step, lockedTests(rm).filter((f) => r.files.some((p) => p && f.startsWith(p)))]).filter(([, fs]) => fs.length)
+  return by.length ? `이대로 시작할까요? ${by.map(([s, fs]) => `${s} 에서 시험 고치기도 허락할까요? (걸리는 시험: ${fs.join(', ')})`).join(' ')} (허락하고 시작 / 바꿀 것)` : '이대로 시작할까요? (시작 / 바꿀 것)'
+}
+// 이미 있는 제품에 더할 때의 기획 차례. 모든 마일스톤을 닫은 뒤와, 다음 마일스톤 장면이 아직 자리표시일 때 함께 쓴다.
+const replanHint = (what) => `${what}: 기획서의 관련 장면·결정(다시 볼 조건)·깨진 가정·"## 나중에"·확인 기록(.rail/check/*.json)의 nice 를 읽고, 그 기능이 닿는 지금 코드와 시험을 확인한다. 지금 되는 것과 바뀔 것을 짧게 보여 주고 같은 기획서를 지금 사실로 고친다(장면 채우기, 맨 위 네 줄·화면 다시 쓰기, 지도 줄, 바뀐 옛 결정은 "결정: 바뀜 (→ D-xx)"). 그 뒤 ${approveHint('PLAN.md', '이렇게 고친 기획서대로 갈까요? (맞음 / 고칠 문장)', '고친 줄을')}`
 export const SCENE_PREP = (m) =>
   `점검표 .rail/rehearsal/${m}/checklist.md 를 쓰고(0번은 "지금 화면이 오늘 빌드인가") 명세 .orchestration/${m}-rehearsal-spec.md 로 worker start ${m}-rehearsal --agent claude --role rehearsal. 리허설 작업자는 항목마다 .rail/rehearsal/${m}/<번호>.png 와 result.json({"items":[{"id":"0","check":"<항목>","result":"pass|fail","saw":"<본 숫자 한 줄>","shot":"0.png"}]})을 쓰고 rehearsal-record ${m}`
 
@@ -81,15 +91,24 @@ export function describe(st) {
     if (!rm)
       next = `기획 · 인터뷰 — docs/plan/refs/ 가 있으면 먼저 보고, 보여 주고 반응 받기로 한 번에 하나씩 묻습니다(ask "<질문 한 줄>" 로 기록하고 턴을 끝내고, 답이 오면 answer "<답 그대로>", 세 번마다 되짚기). 더 물어서 범위·성공 기준·시작 여부가 바뀔지 한 문장으로 말할 수 없으면 멈추고 ${form}로 docs/PLAN.md 를 쓴다`
     else if (sp.length) next = `기획서 마무리 — ${sp[0]}. ${/승인 날짜/.test(sp[0]) ? approveHint('PLAN.md', '이 기획서대로 갈까요? (맞음 / 고칠 문장)', '맨 위 네 줄·성공 장면·첫날 실패 장면·마일스톤 지도를') : form}`
-    else (next = `기획서가 승인됐습니다. ${nextOpenMilestone(st, rm)} 착수 전 결정·시험으로 넘어갑니다 (advance decide --milestone ${nextOpenMilestone(st, rm)})`), (skill = 'rail')
+    else {
+      // 승인 직후 한 번(기획 단계는 처음 한 번뿐이다): CLAUDE.md 빈칸(코드 지도 위의 <…>)과 검사 명령.
+      const [blanks, cc] = [(read(F.claude) ?? '').split(/\n## 코드\s*지도/)[0].match(/<[^>\n]+>/g)?.length, loadConfig().checkCommand]
+      next = `기획서가 승인됐습니다. 먼저 ${blanks ? `CLAUDE.md 빈칸 ${blanks}곳(제품 한 줄, 명령, 되돌리기 어려운 일)을 채우고, ` : ''}.rail/config.json 의 checkCommand(${cc ? `지금 "${cc}"` : '비어 있음'})가 제품의 시험 명령인지 본다. 타입 검사(예: tsc --noEmit)·린터가 있으면 함께 넣고 너무 느리면 빠른 것만. 그다음 ${nextOpenMilestone(st, rm)} 착수 전 결정·시험으로 넘어갑니다 (advance decide --milestone ${nextOpenMilestone(st, rm)})`
+      skill = 'rail'
+    }
   } else if (st.stage === 'decide') {
     pos = `${m} 시작 전 · 착수 전 결정과 시험`
     const open = openRisks(m, rm)
     const unpicked = (rm?.ms.find((x) => x.id === m)?.risks ?? []).find((id) => protoCard(id)?.on && !open.some((d) => d.id === id) && !readEvents().some((e) => e.event === 'proto_picked' && e.proto === id))
-    const noCheck = loadConfig().checkCommand ? '' : ' · .rail/config.json 의 checkCommand 가 비었습니다. 제품 스택이 정해졌으면 채우기(예: npm test. 타입 검사·린터가 있으면 함께, 너무 느리면 빠른 것만)'
-    if (open.length) next = protoNext(open[0].id) ?? `착수 전 풀기 — 남은 것: ${open.map((d) => d.id).join(', ')}. 지금: ${open[0].id} (${open[0].why}) — ${cardHint(open[0], m, st)}`
+    // 앞 마일스톤을 닫을 때 이 마일스톤 장면이 자리표시였으면(stage_advance replan) 채운 뒤에도 다시 승인받을 때까지 기획을 안내한다.
+    const [ev, draft] = [readEvents(), rm ? draftScenes(m, rm) : []]
+    const adv = ev.findLast((e) => e.event === 'stage_advance' && e.to === 'decide' && e.milestone === m)
+    if (draft.length || (adv?.replan && !ev.some((e) => e.t >= adv.t && e.event === 'human_answer' && e.kind === 'approve' && /기획서/.test(e.q))))
+      (next = replanHint(`${m} 기획 — ${draft.length ? `장면 ${draft.join(', ')} 이(가) 아직 자리표시라 advance milestone 이 막힙니다` : `장면 ${adv.replan.join(', ')} 을(를) 채웠으면 고친 기획서를 다시 승인받는다`}`)), (skill = 'rail-plan')
+    else if (open.length) next = protoNext(open[0].id) ?? `착수 전 풀기 — 남은 것: ${open.map((d) => d.id).join(', ')}. 지금: ${open[0].id} (${open[0].why}) — ${cardHint(open[0], m, st)}`
     else if (unpicked) next = `시제품 정리 — 고른 변주의 화면을 기준 화면으로 옮기고 시제품 작업 공간 지우기 (proto pick ${unpicked} <변주>). 옮긴 .rail/reference/${m}/ 는 커밋에 넣는다`
-    else (next = `${m} 착수 전 결정·시험이 모두 풀렸습니다. 마일스톤을 시작합니다 (advance milestone)${noCheck}`), (skill = 'rail')
+    else (next = `${m} 착수 전 결정·시험이 모두 풀렸습니다. 마일스톤을 시작합니다 (advance milestone)`), (skill = 'rail')
   } else if (st.stage === 'milestone') {
     const plan = readPlan(m)
     const rows = plan?.rows ?? null
@@ -99,9 +118,13 @@ export function describe(st) {
     const row = (id) => plan.rows.find((r) => r.step === id)
     const hasWorker = new Set(openWorkers(st).map((w) => w.step))
     const feat = (id) => isFeatureRole(row(id)) && !partOff('feature-check')
-    const go = (id) => (feat(id) ? featureHint(st, row(id), startHint(row(id)), (s) => afterWorker(row(id), s)) : hasWorker.has(id) ? doneHint(row(id)) : `${startHint(row(id))}. 그다음 ${doneHint(row(id))}`)
+    // 기능이 아닌 줄의 작업자를 이미 닫았으면 다시 띄우라 하지 않고 끝내는 쪽을 안내한다(리뷰면 리뷰 기록의 must 를 본다).
+    const closed = (id) => !hasWorker.has(id) && readEvents().some((e) => e.milestone === m && e.event === 'worker_closed' && e.step === id)
+    const finish = (id) => `작업자를 닫았습니다 — ${isolated(roleFlag(row(id))) ? '' : `${commitHint(row(id))} → `}step-done ${id} --note "<시험 결과 한 줄>" [--commit <해시>]${isReviewRole(row(id)) ? `. .rail/review/${id}.json 에 must 가 있으면 step-done 뒤 표에 맡는 쪽 "고침" 줄(완료 기준 = 그 must 의 재현이 통과)을 더한다` : ''} (작업자가 실패해 다시 띄울 때만 worker start)`
+    const go = (id) => (feat(id) ? featureHint(st, row(id), startHint(row(id)), (s) => afterWorker(row(id), s), isolated('fix') ? '' : commitHint(row(id))) : hasWorker.has(id) ? doneHint(row(id)) : closed(id) ? finish(id) : `${startHint(row(id))}. 그다음 ${doneHint(row(id))}`)
+    const approveAsk = (rs) => `ask "${startQ(rs, rm)}" --kind approve`
     if (!rows?.length)
-      next = `${m} step 표 ${rows ? '채우기' : '만들기'} — docs/plan/${m}.md 에 현재 마일스톤만. 머리줄 "| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |", 기본은 기능 목록: 줄 하나가 사용자가 알아볼 기능 하나(맡는 쪽 "기능", 할 일 = 기능 이름, 완료 기준 = 무엇이 보이면 끝인지와 확인 명령, 기획서 장면의 "이어지는 step" 이 가리키는 줄은 그 장면의 자동 확인 그대로(그 확인이 배포된 주소처럼 바깥 상태를 보면 그 부분은 마지막 리뷰·리허설 전 배포 뒤의 마일스톤 끝 확인으로 두고, 줄의 완료 기준에는 로컬로 재는 부분만 옮긴다), 작업자 하나가 시험과 구현을 함께)이고 마지막 줄은 "마지막 리뷰"(예전 방식 시험·구현·리뷰도 쓸 수 있다), 기다리는 step 칸은 비우면 앞 step 모두·"없음"이면 안 기다림, 동시에 돌 step 의 파일 칸은 겹치지 않게, 상태 칸은 비우고 어느 칸에도 | 를 쓰지 않는다. 쓴 뒤 ${autonomyOn() ? '자율 모드라 묻지 않고 첫 step-start' : '표를 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve'}`
+      next = `${m} step 표 ${rows ? '채우기' : '만들기'} — docs/plan/${m}.md 에 현재 마일스톤만. 머리줄 "| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |", 기본은 기능 목록: 줄 하나가 사용자가 알아볼 기능 하나(맡는 쪽 "기능", 할 일 = 기능 이름, 완료 기준 = 무엇이 보이면 끝인지와 확인 명령, 기획서 장면의 "이어지는 step" 이 가리키는 줄은 그 장면의 자동 확인 그대로(그 확인이 배포된 주소처럼 바깥 상태를 보면 그 부분은 마지막 리뷰·리허설 전 배포 뒤의 마일스톤 끝 확인으로 두고, 줄의 완료 기준에는 로컬로 재는 부분만 옮긴다), 작업자 하나가 시험과 구현을 함께)이고 마지막 줄은 "마지막 리뷰"(예전 방식 시험·구현·리뷰도 쓸 수 있다), 기다리는 step 칸은 비우면 앞 step 모두·"없음"이면 안 기다림, 동시에 돌 step 의 파일 칸은 겹치지 않게, 상태 칸은 비우고 어느 칸에도 | 를 쓰지 않는다. 쓴 뒤 ${autonomyOn() ? '자율 모드라 묻지 않고 첫 step-start' : lockedTests(rm).length ? 'status 를 다시 본다(기획서의 걸리는 시험 허락을 묶은 표 승인 질문이 나온다)' : `표를 보여 주고 ${approveAsk([])}`}`
     else if (pp.length) next = `표 검사 실패 — ${pp[0]}`
     else {
       const open = rows.filter((r) => !isDone(r.status))
@@ -110,12 +133,12 @@ export function describe(st) {
       // 새 표의 첫 시작 전에는 사람의 표 승인이 먼저다(자율 모드면 묻지 않는다). 승인 뒤 더한 기능 줄(표 승인 답·auto_start 가 남긴 줄 목록에 없는 줄)도 시작 전에 승인을 안내한다. 막지는 않는다.
       const base = readEvents().findLast((e) => e.milestone === m && e.steps?.length && (e.event === 'auto_start' || e.kind === 'approve'))?.steps
       const added = base ? ready.filter((id) => isFeatureRole(row(id)) && !base.includes(id)).join(', ') : ''
-      const plus = !added ? '' : autonomyOn() ? `자율 모드: 승인 뒤 더한 기능 ${added} 은(는) 기본으로 기획서 "## 나중에" 로 옮기고 표에서 뺀다. 지금 장면을 깨는 문제를 고치는 줄이면 ` : `표 승인 뒤 더한 기능 줄 ${added} 을(를) 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve 로 묻고 턴을 끝내기. 승인 답이 오면 `
+      const plus = !added ? '' : autonomyOn() ? `자율 모드: 승인 뒤 더한 기능 ${added} 은(는) 기본으로 기획서 "## 나중에" 로 옮기고 표에서 뺀다. 지금 장면을 깨는 문제를 고치는 줄이면 ` : `표 승인 뒤 더한 기능 줄 ${added} 을(를) 보여 주고 ${approveAsk(rows.filter((r) => added.split(', ').includes(r.step)))} 로 묻고 턴을 끝내기. 승인 답이 오면 `
       const also = ready.length ? ` · 함께 시작할 수 있는 step: ${ready.join(', ')} (${plus}각각 step-start)` : ''
-      const fresh = !autonomyOn() && !st.gates.plan_approved?.[m] && rows.every((r) => !isDone(r.status) && !isActive(r.status)) ? '표를 사람이 승인하지 않았으면 표를 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve 로 묻고 턴을 끝내기. 승인됐으면 ' : plus
+      const fresh = !autonomyOn() && !st.gates.plan_approved?.[m] && rows.every((r) => !isDone(r.status) && !isActive(r.status)) ? `표를 사람이 승인하지 않았으면 표를 보여 주고 ${approveAsk(rows)} 로 묻고 턴을 끝내기. 승인됐으면 ` : plus
       if (doing.length === 1) next = `step ${doing[0]} 진행 중 — ${go(doing[0])}${also} ${left}`
       else if (doing.length)
-        next = `step ${doing.join(', ')} 동시 진행 중 — 끝나는 대로 하나씩(한꺼번에 하지 않는다): 작업자의 worker_done 이 오면 worker done <step> → 그 step 만 커밋 관문(다른 step 이 아직 쓰는 파일 때문에 checkCommand 가 실패하면 그 step 이 끝난 뒤 다시) → step-done <step> --note "<한 줄>"${doing.some((id) => isolated(roleFlag(row(id)))) ? ' (worktree 방식의 만드는 step 은 커밋 관문을 그 worktree 에서 먼저 하고, 그다음 worker done 이 합친다)' : ''}${doing.some(feat) ? ` · 기능 줄은 step-done 전에 확인 step: ${doing.filter(feat).map((id) => `${id}: ${go(id)}`).join('; ')}` : ''}${doing.some((id) => !hasWorker.has(id) && !feat(id)) ? ` · 작업자가 없는 step: ${doing.filter((id) => !hasWorker.has(id) && !feat(id)).map((id) => startHint(row(id))).join('; ')}` : ''}${also} ${left}`
+        next = `step ${doing.join(', ')} 동시 진행 중 — 끝나는 대로 하나씩(한꺼번에 하지 않는다): 작업자의 worker_done 이 오면 worker done <step> → 그 step 만 커밋 관문(다른 step 이 아직 쓰는 파일 때문에 checkCommand 가 실패하면 그 step 이 끝난 뒤 다시) → step-done <step> --note "<한 줄>"${doing.some((id) => isolated(roleFlag(row(id)))) ? ' (worktree 방식의 만드는 step 은 커밋 관문을 그 worktree 에서 먼저 하고, 그다음 worker done 이 합친다)' : ''}${doing.some(feat) ? ` · 기능 줄은 step-done 전에 확인 step: ${doing.filter(feat).map((id) => `${id}: ${go(id)}`).join('; ')}` : ''}${doing.some((id) => !hasWorker.has(id) && !feat(id)) ? ` · 작업자가 없는 step: ${doing.filter((id) => !hasWorker.has(id) && !feat(id)).map((id) => (closed(id) ? `${id}: ${finish(id)}` : startHint(row(id)))).join('; ')}` : ''}${also} ${left}`
       else if (ready.length === 1) next = `step ${ready[0]} 진행 — ${fresh}먼저 step-start ${ready[0]}, 그다음 ${startHint(row(ready[0]))} ${left}`
       else if (ready.length) next = `step ${ready.join(', ')} 을(를) 동시에 시작할 수 있습니다 — ${fresh}각각 step-start 하고 명세를 써서 worker start <step> 으로 작업자를 나눈 창에 함께 띄우기 (같은 에이전트·역할이면 한 번에) ${left}`
       else if (open.length) next = `step ${open[0].step} 진행 — 먼저 step-start ${open[0].step} ${left}`
@@ -143,17 +166,16 @@ export function describe(st) {
     else if (!sc && rh && selfFix(st).ok)
       next = `스스로 고치기 (${selfFix(st).n + 1}/${SELF_FIX_MAX}) — 리허설 실패 ${rh.failed.map((f) => f.id).join(', ')} 는 기계로 가릴 수 있는 항목이라 사람에게 묻기 전에 고칩니다: reopen --self-fix, 그다음 고칠 줄을 더하고 다시 리허설`
     else if (!sc && rh && pendingClose(st, rm).ok)
-      next = `장면 판정 대기로 닫기 — ${pendingClose(st, rm).why}. ${livingHint(rm, m, st)}advance close 로 ${m} 를 판정 대기 목록에 올리고(판정으로 고친 시험 목록도 함께) 다음 마일스톤으로 넘어간다(사람 판정은 돌아왔을 때 scene ${m} --result pass|fail --note "<본 것>")`
+      next = `장면 판정 대기로 닫기 — ${pendingClose(st, rm).why}. ${beforeClose(rm, m, st)}advance close 로 ${m} 를 판정 대기 목록에 올리고(판정으로 고친 시험 목록도 함께) 다음 마일스톤으로 넘어간다(사람 판정은 돌아왔을 때 scene ${m} --result pass|fail --note "<본 것>")`
     else if (!sc && rh)
       next = `리허설 결과(스크린샷 ${rh.total}장, 통과 ${rh.pass}/${rh.total}${rh.failed.length ? `, 실패 ${rh.failed.map((f) => f.id).join(', ')} 먼저` : ''})를 사람에게 보여 주고 장면 질문하기 (ask --scene). 실패 항목과 스크린샷을 먼저, 통과 항목은 본 숫자와 경로를 한 줄씩. 출력된 질문을 그대로 보이고 턴을 끝내기`
     else if (!sc) next = '장면 점검표 띄우고 사람이 직접 해 보게 하기'
     else if (sc.result !== 'pass') next = '장면 확인이 실패로 기록됐습니다. 고칠 step 을 더하고 다시 확인합니다 (reopen). 새 줄의 상태 칸은 비우고, 새로 정할 것이 생기면 기획서 결정과 시험에 줄을 더하고 계획 밖 결정으로 센다'
-    else (next = `${m} 를 닫습니다 — ${livingHint(rm, m, st)}advance close. 출력의 [덜어내기]·[알림 실패] 줄을 사람에게 그대로 전하고, 바뀐 문서는 커밋 정책대로 커밋`), (skill = 'rail')
+    else (next = `${m} 를 닫습니다 — ${beforeClose(rm, m, st)}advance close. 출력의 [덜어내기]·[알림 실패] 줄을 사람에게 그대로 전하고, 바뀐 문서는 커밋 정책대로 커밋`), (skill = 'rail')
   } else {
     pos = '모든 마일스톤 완료'
     const open = nextOpenMilestone(st, rm)
-    const more = `주인이 기능을 더하자고 하면: 기획서의 관련 장면·결정(다시 볼 조건)·깨진 가정·"## 나중에"·확인 기록(.rail/check/*.json)의 nice 를 읽고, 그 기능이 닿는 지금 코드와 시험을 확인한다. 지금 되는 것과 바뀔 것을 짧게 보여 주고 같은 기획서(맨 위 네 줄·장면·화면·지도)를 고친 뒤 ${approveHint('PLAN.md', '이렇게 고친 기획서대로 갈까요? (맞음 / 고칠 문장)', '고친 줄을')}`
-    next = open ? `기획서 마일스톤 지도에 새 마일스톤 ${open} 이 있습니다 — 먼저 달라진 범위와 완료 기준을 주인에게 보여 주고 승인을 받았는지 본다(아직이면 보여 주고 묻는다). 받았으면 advance decide --milestone ${open}` : `남은 일이 없습니다. ${more}`
+    next = open ? `기획서 마일스톤 지도에 새 마일스톤 ${open} 이 있습니다 — 먼저 달라진 범위와 완료 기준을 주인에게 보여 주고 승인을 받았는지 본다(아직이면 보여 주고 묻는다). 받았으면 advance decide --milestone ${open}` : `남은 일이 없습니다. ${replanHint('주인이 기능을 더하자고 하면')}`
     skill = open ? 'rail' : 'rail-plan'
   }
   if (st.human_ask && !/answer|질문을 바꿔 묻기/.test(next)) next += ` · 사람 답이 오면 answer "<답 그대로>" (출력이 [다시 묻기] 면 그 질문만 다시 묻고 턴을 끝내기)`

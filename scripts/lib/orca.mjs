@@ -1,6 +1,6 @@
 // Orca CLI 부르기를 한 곳에 모은다. ORCA_CLI_COMMAND 가 있으면 그것을 부른다(시험의 가짜 orca).
 import { spawnSync } from 'node:child_process'
-import { lastLines } from './core.mjs'
+import { WIN, lastLines } from './core.mjs'
 
 export function orca(args, timeout = 90_000) {
   const bin = process.env.ORCA_CLI_COMMAND || 'orca'
@@ -18,7 +18,6 @@ export function orca(args, timeout = 90_000) {
 
 // Windows 의 Orca 명령은 배치 파일(orca.cmd)이라 셸 없이는 부를 수 없다. cmd 를 거치되 인자는 cmd 가 다시 읽지 못하게 막고
 // (cross-spawn 과 같은 방식: 배치 파일이 %* 로 한 번 더 읽으므로 두 번 막는다), cmd 가 자르는 줄바꿈 든 --body 는 표준 입력(--body-file -)으로 보낸다.
-const WIN = process.platform === 'win32'
 const META = /([()\][%!^"`<>&|;, *?])/g
 function viaCmd(bin, args, o) {
   const i = args.indexOf('--body')

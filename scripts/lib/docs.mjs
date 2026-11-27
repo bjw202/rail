@@ -1,4 +1,5 @@
 // 문서 읽기: 기획서 docs/PLAN.md 한 장(BRIEF·ROADMAP 을 대신한다)과 시제품 결정 카드.
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import { F, read, today } from './core.mjs'
 
@@ -81,8 +82,19 @@ export function decisionStatus(id, sh = readSheet()) {
   const why = !s ? `"${k}:" 칸이 없습니다` : m ? `"${k}: ${s}" 의 기한 ${m[1]} 이 지났습니다 (다시 정하거나 기한을 새로 붙인다)` : `"${k}: ${s}" 입니다 (${/^(?:미룸|판단\s*보류)/.test(s) ? '기한을 "(2026-12-01)" 꼴로 붙인다' : /^미정/.test(s) ? '사람이 아직 고르지 않음' : /^미실행/.test(s) ? '아직 시험하지 않음' : /^실패/.test(s) ? '다른 방법을 시험하거나 착수 전에서 빼고 범위를 줄인다' : /^바뀜/.test(s) ? '바뀜이면 새 번호를 착수 전에 적는다' : `정해진 말이 아닙니다: ${d ? '선택함 (<고른 것>) · AI가 고름(위임) · 미룸(<기한>)' : '통과 · 통과(작은 예제 범위까지만) · 판단 보류(<기한>)'}`})`
   return { id, ok: false, why }
 }
-// 마일스톤의 착수 전 항목 중 풀리지 않은 것. 바로 시작(advance milestone)과 미리 승인(plan approve)이 같은 판정을 쓴다.
+// 마일스톤의 착수 전 항목 중 풀리지 않은 것.
 export const openRisks = (id, sh = readSheet()) => (sh?.ms.find((x) => x.id === id)?.risks ?? []).map((r) => decisionStatus(r, sh)).filter((d) => !d.ok)
+// 아직 자리표시인 장면: 제목에 "(예상)", 자동 확인이 비었거나 <…>·"기획할 때 정한다" 꼴, 착수 전이 그 꼴. 처음부터 다 채운 기획서는 걸리지 않는다.
+const VAGUE = /<[^>]+>|기획할\s*때/
+export const draftScenes = (id, sh = readSheet()) => {
+  const mine = sh?.ms.find((x) => x.id === id)?.scenes ?? []
+  return sh.scenes.filter((s) => mine.includes(s.id) && (/\(예상\)/.test(s.title) || VAGUE.test(field(s.body, '자동\\s*확인') ?? '<>') || VAGUE.test(field(s.body, '착수\\s*전') ?? ''))).map((s) => s.id)
+}
+// 마일스톤을 시작하지 못하는 까닭. 바로 시작(advance milestone)과 미리 승인(plan approve)이 같은 판정을 쓴다.
+export function startProblems(id, sh = readSheet()) {
+  const draft = sh ? draftScenes(id, sh) : []
+  return [...(draft.length ? [`장면 ${draft.join(', ')} 이(가) 아직 자리표시입니다 (그 마일스톤을 기획해 장면을 채우고 다시 승인받는다)`] : []), ...openRisks(id, sh).map((d) => `착수 전 ${d.id} 가 풀리지 않았습니다 (${d.why})`)]
+}
 // 계획 밖 결정 수: 마일스톤 시작 때 남긴 "결정과 시험" 번호(gates.plan_marks)에 없던 번호의 수. 닫으면 gates.unplanned 에 남는다.
 // 돌려주는 값: { id, now, total, said }  id·now = 지금(시작한 뒤면 지금 마일스톤, 아니면 마지막으로 닫은 것), total = 누적, said = 기획서에 리더가 적은 누적 수.
 export function unplanned(st, sh = readSheet()) {
@@ -96,6 +108,8 @@ export function unplanned(st, sh = readSheet()) {
 export const gradeLine = (g) => g && `이번(${g.id}) ${g.now} · 누적 ${g.total} (코드가 셈${g.said !== null && g.said !== g.total ? `, 기획서에 적은 누적 ${g.said}번과 ${Math.abs(g.total - g.said)} 차이` : ''})`
 export const cardFile = (id) => (fs.existsSync(F.decisions) ? fs.readdirSync(F.decisions).find((n) => n.startsWith(id + '.') || n.startsWith(id + '-')) ?? null : null)
 
+// "살아 있는 세 줄"의 지문. 장면 확인으로 갈 때 남긴 것과 같으면 이번 마일스톤 동안 고치지 않은 것이다.
+export const livingMark = (sh) => createHash('sha1').update((sh?.living ?? []).join('\n').trim()).digest('hex').slice(0, 12)
 export const nextOpenMilestone = (st, sh) => sh?.ms.find((m) => !st.closed.includes(m.id))?.id ?? null
 // 닫은 마일스톤의 지도 줄 끝에 "✅ (끝 날짜)" 를 붙인다. 이미 붙어 있으면 그대로 둔다.
 export function markClosed(id) {
