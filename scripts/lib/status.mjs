@@ -86,7 +86,7 @@ export function describe(st) {
     pos = `${m} 시작 전 · 착수 전 결정과 시험`
     const open = openRisks(m, rm)
     const unpicked = (rm?.ms.find((x) => x.id === m)?.risks ?? []).find((id) => protoCard(id)?.on && !open.some((d) => d.id === id) && !readEvents().some((e) => e.event === 'proto_picked' && e.proto === id))
-    const noCheck = loadConfig().checkCommand ? '' : ' · .rail/config.json 의 checkCommand 가 비었습니다. 제품 스택이 정해졌으면 채우기(예: npm test)'
+    const noCheck = loadConfig().checkCommand ? '' : ' · .rail/config.json 의 checkCommand 가 비었습니다. 제품 스택이 정해졌으면 채우기(예: npm test. 타입 검사·린터가 있으면 함께, 너무 느리면 빠른 것만)'
     if (open.length) next = protoNext(open[0].id) ?? `착수 전 풀기 — 남은 것: ${open.map((d) => d.id).join(', ')}. 지금: ${open[0].id} (${open[0].why}) — ${cardHint(open[0], m, st)}`
     else if (unpicked) next = `시제품 정리 — 고른 변주의 화면을 기준 화면으로 옮기고 시제품 작업 공간 지우기 (proto pick ${unpicked} <변주>). 옮긴 .rail/reference/${m}/ 는 커밋에 넣는다`
     else (next = `${m} 착수 전 결정·시험이 모두 풀렸습니다. 마일스톤을 시작합니다 (advance milestone)${noCheck}`), (skill = 'rail')
