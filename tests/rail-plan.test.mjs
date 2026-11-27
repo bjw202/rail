@@ -20,7 +20,8 @@ describe('기획 단계: 기획서 한 장', () => {
     put(root, 'docs/PLAN.md', planDoc())
     assert.match(next(root), /^기획서가 승인됐습니다\. M0 착수 전 결정·시험으로 넘어갑니다 \(advance decide --milestone M0\)/)
     assert.equal(rail(root, 'advance', 'decide', '--milestone', 'M0').code, 0)
-    assert.deepEqual([state(root).stage, state(root).gates.sheet_approved], ['decide', '2026-11-24'])
+    assert.deepEqual([state(root).stage, state(root).milestone], ['decide', 'M0'])
+    assert.ok(!('sheet_approved' in state(root).gates), '아무도 읽지 않는 승인 날짜 사본은 상태에 남기지 않는다(원본은 기획서의 승인 줄)')
   })
 })
 
@@ -59,11 +60,12 @@ describe('착수 전: 결정과 시험의 상태 말', () => {
       assert.equal(r.code, 1, t)
       assert.match(r.err, /착수 전 T-01 가 풀리지 않았습니다/, t)
       assert.equal(state(root).stage, 'decide')
-      assert.deepEqual(state(root).gates.risks_decided, {}, '실패한 시험 번호를 풀린 것으로 남기지 않는다')
+      assert.equal(events(root).findLast((e) => e.event === 'gate_blocked')?.target, 'milestone', t)
     }
     const root = at({ ...D, 'T-01': '시험: 통과 · 0.4초' })
     assert.equal(rail(root, 'advance', 'milestone').code, 0)
-    assert.deepEqual([state(root).stage, state(root).gates.risks_decided.M0, state(root).gates.plan_marks.M0], ['milestone', ['D-01', 'T-01'], ['D-01', 'T-01']])
+    assert.deepEqual([state(root).stage, state(root).gates.plan_marks.M0], ['milestone', ['D-01', 'T-01']])
+    assert.ok(!('risks_decided' in state(root).gates), '아무도 읽지 않는 착수 전 번호 사본은 상태에 남기지 않는다')
   })
 })
 

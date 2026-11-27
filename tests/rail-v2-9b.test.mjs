@@ -35,7 +35,7 @@ describe('단계 관문은 순서와 착수 전 항목만 본다', () => {
     blocked(run(r, ['advance', 'decide']), /--milestone Mx 를 붙이세요/)
     blocked(run(r, ['advance', 'decide', '--milestone', 'M1']), /다음 마일스톤은 M0 입니다/)
     ok(run(r, ['advance', 'decide', '--milestone', 'M0']))
-    assert.equal(state(r).gates.sheet_approved, null, '승인 줄이 없으면 승인 날짜도 없다')
+    assert.deepEqual([state(r).stage, state(r).milestone], ['decide', 'M0'], '승인 줄이 없어도 관문은 순서만 보고 통과한다')
     put(r, 'docs/plan/M1.md', `${HEAD}| M1-1 | 기능 | 가 | src/a.mjs | 없음 | 보인다 | |\n`)
     blocked(run(r, ['advance', 'milestone', '--milestone', 'M1']), /지금 시작 전 마일스톤은 M0 입니다/)
     blocked(run(r, ['advance', 'milestone']), /착수 전 D-01 가 풀리지 않았습니다 \("결정: 미정" 입니다/)

@@ -20,7 +20,7 @@ export const SKILL_OF = { plan: 'rail-plan', decide: 'rail-plan', milestone: 'ra
 
 // ---------- 상태 표시 ----------
 // 절차의 원본은 이 파일 하나다. 스킬에는 코드가 할 수 없는 판단(인터뷰, 카드 쓰기, 지시서 내용)만 남긴다.
-export const approveHint = (doc, q, what) => `${what} 보여 주고 ask "${q}" --kind approve 로 묻고 턴을 끝내기. "맞음"이면 answer 로 남긴 뒤 ${doc} 맨 위에 "승인: ${today()}" 한 줄을 더한다(사람의 "맞음" 없이 쓰지 않는다)`
+export const approveHint = (doc, q, what) => `${what} 보여 주고 ask "${q}" --kind approve 로 묻고 턴을 끝내기. "맞음"이면 answer 로 남긴 뒤 ${doc} 맨 위 승인 줄을 "승인: ${today()}" 로 둔다(없으면 더하고 있으면 날짜를 바꾼다. 사람의 "맞음" 없이 쓰지 않는다)`
 export const roleFlag = (row) => (/마지막\s*리뷰/.test(row.role) ? 'final-review' : isTestRole(row) ? 'test' : isReviewRole(row) ? 'review' : isImplRole(row) ? 'impl' : isFeatureRole(row) ? 'feature' : isFixRole(row) ? 'fix' : null)
 export function startHint(row) {
   const role = roleFlag(row) ?? '<feature|fix|test|impl|review|final-review>'
@@ -101,7 +101,7 @@ export function describe(st) {
     const feat = (id) => isFeatureRole(row(id)) && !partOff('feature-check')
     const go = (id) => (feat(id) ? featureHint(st, row(id), startHint(row(id)), (s) => afterWorker(row(id), s)) : hasWorker.has(id) ? doneHint(row(id)) : `${startHint(row(id))}. 그다음 ${doneHint(row(id))}`)
     if (!rows?.length)
-      next = `${m} step 표 ${rows ? '채우기' : '만들기'} — docs/plan/${m}.md 에 현재 마일스톤만. 머리줄 "| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |", 기본은 기능 목록: 줄 하나가 사용자가 알아볼 기능 하나(맡는 쪽 "기능", 할 일 = 기능 이름, 완료 기준 = 무엇이 보이면 끝인지와 확인 명령, 기획서 장면의 "이어지는 step" 이 가리키는 줄은 그 장면의 자동 확인 그대로, 작업자 하나가 시험과 구현을 함께)이고 마지막 줄은 "마지막 리뷰"(예전 방식 시험·구현·리뷰도 쓸 수 있다), 기다리는 step 칸은 비우면 앞 step 모두·"없음"이면 안 기다림, 동시에 돌 step 의 파일 칸은 겹치지 않게, 상태 칸은 비우고 어느 칸에도 | 를 쓰지 않는다. 쓴 뒤 ${autonomyOn() ? '자율 모드라 묻지 않고 첫 step-start' : '표를 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve'}`
+      next = `${m} step 표 ${rows ? '채우기' : '만들기'} — docs/plan/${m}.md 에 현재 마일스톤만. 머리줄 "| step | 맡는 쪽 | 할 일 | 고쳐도 되는 파일 | 기다리는 step | 완료 기준 | 상태 |", 기본은 기능 목록: 줄 하나가 사용자가 알아볼 기능 하나(맡는 쪽 "기능", 할 일 = 기능 이름, 완료 기준 = 무엇이 보이면 끝인지와 확인 명령, 기획서 장면의 "이어지는 step" 이 가리키는 줄은 그 장면의 자동 확인 그대로(그 확인이 배포된 주소처럼 바깥 상태를 보면 그 부분은 마지막 리뷰·리허설 전 배포 뒤의 마일스톤 끝 확인으로 두고, 줄의 완료 기준에는 로컬로 재는 부분만 옮긴다), 작업자 하나가 시험과 구현을 함께)이고 마지막 줄은 "마지막 리뷰"(예전 방식 시험·구현·리뷰도 쓸 수 있다), 기다리는 step 칸은 비우면 앞 step 모두·"없음"이면 안 기다림, 동시에 돌 step 의 파일 칸은 겹치지 않게, 상태 칸은 비우고 어느 칸에도 | 를 쓰지 않는다. 쓴 뒤 ${autonomyOn() ? '자율 모드라 묻지 않고 첫 step-start' : '표를 보여 주고 ask "이대로 시작할까요? (시작 / 바꿀 것)" --kind approve'}`
     else if (pp.length) next = `표 검사 실패 — ${pp[0]}`
     else {
       const open = rows.filter((r) => !isDone(r.status))
@@ -152,8 +152,9 @@ export function describe(st) {
   } else {
     pos = '모든 마일스톤 완료'
     const open = nextOpenMilestone(st, rm)
-    next = open ? `기획서 마일스톤 지도에 새 마일스톤 ${open} 이 있습니다 — advance decide --milestone ${open}` : '남은 일이 없습니다'
-    skill = open ? 'rail' : null
+    const more = `주인이 기능을 더하자고 하면: 기획서의 관련 장면·결정(다시 볼 조건)·깨진 가정·"## 나중에"·확인 기록(.rail/check/*.json)의 nice 를 읽고, 그 기능이 닿는 지금 코드와 시험을 확인한다. 지금 되는 것과 바뀔 것을 짧게 보여 주고 같은 기획서(맨 위 네 줄·장면·화면·지도)를 고친 뒤 ${approveHint('PLAN.md', '이렇게 고친 기획서대로 갈까요? (맞음 / 고칠 문장)', '고친 줄을')}`
+    next = open ? `기획서 마일스톤 지도에 새 마일스톤 ${open} 이 있습니다 — 먼저 달라진 범위와 완료 기준을 주인에게 보여 주고 승인을 받았는지 본다(아직이면 보여 주고 묻는다). 받았으면 advance decide --milestone ${open}` : `남은 일이 없습니다. ${more}`
+    skill = open ? 'rail' : 'rail-plan'
   }
   if (st.human_ask && !/answer|질문을 바꿔 묻기/.test(next)) next += ` · 사람 답이 오면 answer "<답 그대로>" (출력이 [다시 묻기] 면 그 질문만 다시 묻고 턴을 끝내기)`
   if (v.length) next = `관문 위반 — ${v[0]}`

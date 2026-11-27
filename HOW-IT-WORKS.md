@@ -58,7 +58,7 @@ stateDiagram-v2
   check --> milestone: reopen
   check --> decide: advance close, 다음 마일스톤 있음
   check --> done: advance close, 남은 마일스톤 없음
-  done --> decide: 지도에 새 마일스톤을 더한 뒤 advance decide
+  done --> decide: 기능을 더할 때 기획서를 고쳐 승인받고 advance decide
 ```
 
 `reopen` 은 관문이 아니라 장면 확인이 실패했을 때 쓰는 되돌림입니다(`scripts/lib/scene.mjs:cmdReopen`).
@@ -73,18 +73,18 @@ stateDiagram-v2
 | 2. 세션 열기 | 위치 세 줄(위치 / 기다리는 것 / 다음 할 일)을 AI 와 사람에게 보이고, 이 세션 번호를 리더로 적습니다 | `status --hook` (훅이 부름) | `state.json` 의 `leader_session`, `busy` | 세션 시작 |
 | 3. `/rail` | 스킬 `rail` 이 `status --json` 출력을 프롬프트에 넣습니다. 리더는 그 `next` 문장을 그대로 하고, 판단이 필요하면 `skill` 칸이 가리키는 하위 스킬을 읽습니다 | `status --json` | `.claude/skills/rail/SKILL.md` | 없음 |
 | 4. 인터뷰 | 단계 `plan`. 리더가 질문 하나를 기록하고 턴을 끝냅니다. 사람이 답하면 답을 그대로 남깁니다. 인터뷰 질문 수를 세고, 세 번째마다 되짚기를 하라고 출력합니다. 질문 수에 상한은 없습니다 | `ask "<질문>"`, `answer "<답>"` | `state.json` 의 `human_ask`, `interview.asked`; 사건 `human_ask`, `human_answer` | 마무리 검사는 열린 질문이 있으면 붙잡지 않습니다 |
-| 5. 기획서 승인 | 리더가 `.rail/plan/template.md` 꼴로 `docs/PLAN.md` 를 씁니다. `status` 가 빠진 줄을 하나씩 알려 주고(`docs.mjs:sheetProblems`), 다 채우면 승인 질문을 하라고 합니다. 사람이 "맞음"이라고 하면 리더가 기획서 맨 위에 `승인: YYYY-MM-DD` 줄을 더한 뒤 다음 단계로 갑니다 | `ask "…" --kind approve`, `answer`, `advance decide --milestone M0` | `docs/PLAN.md`; `state.json` 의 `stage`, `milestone`, `gates.sheet_approved` | 없음 |
-| 6. 착수 전 결정과 가정 시험 | 단계 `decide`. 이 마일스톤의 성공 장면들에 적힌 "착수 전" 번호(D-xx 결정, T-xx 시험)를 모읍니다. 결정은 후보를 보이고 사람에게 묻고, 사람이 고르면 리더가 기획서 그 줄을 `결정: 선택함 (…)` 꼴로 고칩니다. 봐야 아는 결정은 시제품(`proto`)을 붙입니다. 가정 시험은 `.rail/trial/template.md` 로 지시서를 쓰고 버리는 코드로 진짜 자료에 해 본 뒤 `시험: 통과 …` 꼴로 적습니다. 다 풀리면 마일스톤을 시작합니다 | `ask … --kind decide`, `answer`, `proto start/record/card/pick`, `advance milestone` | `docs/PLAN.md` "결정과 시험", `docs/decisions/D-xx-*.md`, `.rail/trial/T-xx/`, `.rail/proto/`; `state.json` 의 `gates.risks_decided`, `gates.plan_marks` | 없음 |
+| 5. 기획서 승인 | 리더가 `.rail/plan/template.md` 꼴로 `docs/PLAN.md` 를 씁니다. `status` 가 빠진 줄을 하나씩 알려 주고(`docs.mjs:sheetProblems`), 다 채우면 승인 질문을 하라고 합니다. 사람이 "맞음"이라고 하면 리더가 기획서 맨 위에 `승인: YYYY-MM-DD` 줄을 더한 뒤 다음 단계로 갑니다 | `ask "…" --kind approve`, `answer`, `advance decide --milestone M0` | `docs/PLAN.md`(승인의 원본은 이 `승인:` 줄 하나); `state.json` 의 `stage`, `milestone` | 없음 |
+| 6. 착수 전 결정과 가정 시험 | 단계 `decide`. 이 마일스톤의 성공 장면들에 적힌 "착수 전" 번호(D-xx 결정, T-xx 시험)를 모읍니다. 결정은 후보를 보이고 사람에게 묻고, 사람이 고르면 리더가 기획서 그 줄을 `결정: 선택함 (…)` 꼴로 고칩니다. 봐야 아는 결정은 시제품(`proto`)을 붙입니다. 가정 시험은 `.rail/trial/template.md` 로 지시서를 쓰고 버리는 코드로 진짜 자료에 해 본 뒤 `시험: 통과 …` 꼴로 적습니다. 다 풀리면 마일스톤을 시작합니다 | `ask … --kind decide`, `answer`, `proto start/record/card/pick`, `advance milestone` | `docs/PLAN.md` "결정과 시험", `docs/decisions/D-xx-*.md`, `.rail/trial/T-xx/`, `.rail/proto/`; `state.json` 의 `gates.plan_marks`(시작할 때 기획서에 있던 번호, 계획 밖 결정을 셀 기준) | 없음 |
 | 7. step 표 | 단계 `milestone`. 리더가 지금 마일스톤의 `docs/plan/Mx.md` 를 씁니다(기본: 줄 하나 = 기능 하나, 마지막 줄은 "마지막 리뷰"). 자율 모드가 아니면 표를 보이고 "이대로 시작할까요?"를 묻습니다. 그 답에는 그때의 줄 목록(`steps`)이 함께 남습니다. 시작하면 상태 칸에 ⏳ 가 들어갑니다 | `ask … --kind approve`, `step-start M0-1` | `docs/plan/M0.md` 의 "상태" 칸; 사건 `step_start`, 자율이면 `auto_start` | 없음 |
-| 8. 작업자(기능) | 리더가 `.orchestration/M0-1-spec.md` 를 씁니다. `worker start` 가 Orca 창을 고르고(리더 탭을 나누거나 새 탭), 그 창에 `claude --dangerously-skip-permissions …` 를 띄우고, Orca 에 지시서를 맡깁니다. 작업자가 끝나면 Orca 가 리더를 깨우고, 리더가 `worker done` 으로 보고를 읽고 그 창 하나만 닫습니다. `isolation` 이 `worktree` 면 작업자는 자기 git worktree 에서 일하고 `worker done` 이 main 에 합칩니다 | `worker start M0-1 --agent claude --role feature`, `worker done M0-1` | `.orchestration/`; 사건 `worker_start`, `worker_done`, `worker_closed` | 작업자 세션에도 같은 레포 설정의 훅(시험 잠금, 마무리 검사)이 걸립니다 |
+| 8. 작업자(기능) | 리더가 `.orchestration/M0-1-spec.md` 를 씁니다. `worker start` 가 Orca 창을 고르고(리더 탭을 나누거나 새 탭. 새 탭이면 출력에 `[새 탭]` 줄을 내고, 리더가 주인에게 그 탭 이름을 전합니다), 그 창에 `claude --dangerously-skip-permissions …` 를 띄우고, Orca 에 지시서를 맡깁니다. 작업자가 끝나면 Orca 가 리더를 깨우고, 리더가 `worker done` 으로 보고를 읽고 그 창 하나만 닫습니다. `isolation` 이 `worktree` 면 작업자는 자기 git worktree 에서 일하고 `worker done` 이 main 에 합칩니다 | `worker start M0-1 --agent claude --role feature`, `worker done M0-1` | `.orchestration/`; 사건 `worker_start`, `worker_done`, `worker_closed` | 작업자 세션에도 같은 레포 설정의 훅(시험 잠금, 마무리 검사)이 걸립니다 |
 | 9. 커밋 관문 | 리더가 검사 명령(`checkCommand`)이 통과하고 바뀐 파일이 그 줄의 "고쳐도 되는 파일" 안인지 봅니다. 그러면 커밋 정책대로 그 step 의 파일만 커밋합니다: 시작 틀의 `auto-local` 이면 묻지 않고 로컬 커밋(푸시 안 함), `ask` 면 사람에게 물은 뒤. 따로 남기는 기록은 없습니다 | `git add <그 step 의 파일>`, `git commit` | 없음 | 마무리 검사 훅이 같은 검사 명령을 돌려, 실패한 채로는 세션이 멈추지 못합니다 |
-| 10. 확인 작업자 | 기능을 만들지 않은 새 작업자가 `.rail/check/template.md` 로 채운 지시서를 받아, 완료 기준을 어기는 경우를 찾습니다. 결과는 `.rail/check/M0-1.json`(`must`, `nice`), 재현 시험은 `.rail/check/M0-1/*.test.mjs` 입니다. `must` 가 있으면 리더가 그 기록을 커밋해 잠근 뒤 고침 작업자 `M0-1-fix` 를 띄웁니다 | `worker start M0-1-check --role check`, `worker start M0-1-fix --role fix` | `.rail/check/` | 확인 결과 폴더는 점으로 시작해 `node --test` 가 저절로 돌리지 않으므로 마무리 검사를 막지 않습니다 |
+| 10. 확인 작업자 | 기능을 만들지 않은 새 작업자가 `.rail/check/template.md` 로 채운 지시서를 받아, 완료 기준을 어기는 경우를 찾습니다. 결과는 `.rail/check/M0-1.json`(`must`, `nice`), 재현 시험은 `.rail/check/M0-1/*.test.mjs` 입니다. 배포 안 됨·키 없음처럼 코드 밖 사정으로 볼 수 없는 기준은 `must` 가 아니고 `nice` 에 "배포 뒤 볼 것"으로 적습니다(틀의 한 줄). `must` 가 있으면 리더가 그 기록을 커밋해 잠근 뒤 고침 작업자 `M0-1-fix` 를 띄웁니다 | `worker start M0-1-check --role check`, `worker start M0-1-fix --role fix` | `.rail/check/` | 확인 결과 폴더는 점으로 시작해 `node --test` 가 저절로 돌리지 않으므로 마무리 검사를 막지 않습니다 |
 | 11. step-done | 상태 칸을 `✅ 끝(날짜) <한 줄>` 로 씁니다. 기능 줄이면 확인 기록이 있어야 하고, `must` 가 있었으면 고침 작업자가 닫혀 있어야 합니다(`check.mjs:featureProblems`). 시험 줄이면 지금의 시험 파일을 기준선에 찍어 커밋 전이어도 잠급니다 | `step-done M0-1 --note "<한 줄>" [--commit <해시>]` | `docs/plan/M0.md`, `.rail/test-baseline.json`; 사건 `step_done` | 기준선이 생긴 뒤에는 시험 잠금이 기준선의 파일도 막습니다 |
 | 12. 마지막 리뷰 | 표의 마지막 줄("마지막 리뷰")은 역할 `final-review` 로 읽히고, `codexRoles`(기본 `["final-review"]`)에 있으므로 Codex 로 띄우라고 안내합니다. `codex` 명령이 PATH 에 없으면 `worker start` 가 Claude 로 대신 띄우고 경고와 `codex_missing` 을 남깁니다 | `worker start Mx-N --agent codex --role final-review` | 지시서가 가리키는 `.rail/review/<step>.json` (코드는 읽지 않음, 11절) | 없음 |
 | 13. 검증기와 장면 단계 | 모든 step 이 ✅ 이면, 검증기(`verify` 설정)가 있을 때 마지막 step 뒤에 `verify` 를 돌리라고 안내합니다. 그다음 장면 확인 단계로 갑니다 | `verify`, `advance check` | 사건 `verify_run` | 없음 |
 | 14. 리허설 | 리더가 점검표 `.rail/rehearsal/Mx/checklist.md`(0번은 "지금 화면이 오늘 빌드인가")와 지시서를 쓰고 리허설 작업자를 띄웁니다. 작업자는 항목마다 스크린샷과 `result.json` 을 씁니다. 리더가 기록하면 통과 수가 상태에 남습니다. 자율 모드에서 실패가 모두 기계로 가릴 수 있는 항목이면 사람에게 묻기 전에 마일스톤마다 두 번까지 스스로 고칩니다 | `worker start Mx-rehearsal --role rehearsal`, `rehearsal-record Mx`, `reopen --self-fix` | `.rail/rehearsal/Mx/`; `state.json` 의 `gates.rehearsed` | 없음 |
 | 15. 장면 판정 | 스크립트가 질문 문구를 만듭니다(리허설 숫자와 답 예시가 듭니다). 사람의 답에서 "됨/안 됨"과 "본 것"을 스크립트가 가르고, 둘 중 하나가 빠지면 한 번 더 물으라고 합니다. "안 됨"이면 `reopen` 으로 step 단계로 돌아가 고칠 줄을 더합니다 | `ask --scene`, `answer "됨. 본 것: …"`, `scene Mx --result pass\|fail --note "…"`, `reopen` | `state.json` 의 `gates.scene_checked`; 사건 `scene_check` | 없음 |
-| 16. 닫기 | 리더가 기획서 "살아 있는 세 줄"을 이 마일스톤 기준으로 고칩니다(계획 밖 결정 수는 스크립트가 센 값을 적으라고 안내). 닫으면 지도 줄 끝에 `✅ (날짜)` 가 붙고, 다음 마일스톤이 있으면 `decide`, 없으면 `done` 으로 갑니다. 빼기 후보를 알리고, 꺼 둔 부품을 다시 켜고, `notify.bot` 이 있으면 Orca 로 한 줄 요약을 보냅니다 | `advance close` | `docs/PLAN.md`; `state.json` 의 `closed`, `gates.unplanned`; 사건 `milestone_closed`, `stage_advance` | 없음 |
+| 16. 닫기 | 리더가 기획서 "살아 있는 세 줄"을 이 마일스톤 기준으로 고칩니다(계획 밖 결정 수는 스크립트가 센 값을 적으라고 안내). 닫으면 지도 줄 끝에 `✅ (날짜)` 가 붙고, 다음 마일스톤이 있으면 `decide`, 없으면 `done` 으로 갑니다. `done` 에서 주인이 기능을 더하자고 하면 `status` 가 기획서의 관련 장면·결정·깨진 가정·"## 나중에"·확인 기록의 `nice` 와 지금 코드·시험을 먼저 읽고, 바뀔 것을 보여 주고, 같은 기획서를 고쳐 승인받으라고 안내합니다. 지도에 새 번호가 생기면 달라진 범위와 완료 기준을 승인받았는지 본 뒤 `advance decide` 를 안내합니다. 빼기 후보를 알리고, 꺼 둔 부품을 다시 켜고, `notify.bot` 이 있으면 Orca 로 한 줄 요약을 보냅니다 | `advance close` | `docs/PLAN.md`; `state.json` 의 `closed`, `gates.unplanned`; 사건 `milestone_closed`, `stage_advance` | 없음 |
 
 ### 계획 밖 결정 수는 이렇게 셉니다
 
@@ -142,6 +142,8 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 리허설 통과를 사람의 판정으로 기록하지 않음 | 스킬 문장입니다 | `skills/rail-check/SKILL.md` |
 | 커밋 정책과 자율 모드는 사람이 이 세션에서 직접 말했을 때만 바꿈 | 코드는 이 둘에 `--said` 를 요구하지 않습니다(`isolation`·부품 끄기·미리 승인만 요구) | `skills/rail/SKILL.md`, `policy.mjs` |
 | 작업자를 버리는 `worker done --force` 는 사람이 정했을 때만 | 스킬 문장입니다 | `skills/rail-milestone/workers.md` |
+| 장면의 자동 확인이 배포된 주소처럼 바깥 상태를 보면 그 부분은 마지막 리뷰·리허설 전 배포 뒤 확인으로 두고, 기능 줄 완료 기준에는 로컬로 재는 부분만 옮김 | step 표 만들기 안내 문장입니다 | `status.mjs` 의 step 표 안내, `skills/rail-milestone/SKILL.md` |
+| 작업자의 서버는 자기가 띄운 것으로 확인하고 끔(서버가 하나뿐인 도구면 리더 서버를 씀), 돈 드는 호출은 무료로 대상을 먼저 확인하고 정한 대상·횟수 안에서만 | 지시서에 넣을 것(스킬 문장)입니다 | `skills/rail-milestone/workers.md` |
 | 기획서를 승인받으면 `CLAUDE.md` 의 빈칸(제품 한 줄, 명령, 되돌리기 어려운 일)을 채움 | 스킬 문장입니다. 코드는 빈칸이 남았는지 보지 않습니다 | `skills/rail-plan/SKILL.md` |
 
 ### 사람이 정하는 것
@@ -187,7 +189,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 | 파일 | 줄 | 하는 일 | 그것을 쓰는 명령 |
 |---|---|---|---|
-| `advance.mjs` | 98 | 관문을 물어 단계를 넘기고, 마일스톤을 닫을 때 기록·정리·알림을 합니다 | `check`, `advance` |
+| `advance.mjs` | 96 | 관문을 물어 단계를 넘기고, 마일스톤을 닫을 때 기록·정리·알림을 합니다 | `check`, `advance` |
 | `ask.mjs` | 50 | 사람에게 묻는 질문 하나를 기록하고 답을 남깁니다 | `ask`, `answer` |
 | `autonomy.mjs` | 127 | 자율 모드의 멈춤 규칙과 폭주 알림입니다 | `next` |
 | `baseline.mjs` | 30 | 시험 파일 목록과 해시를 `.rail/test-baseline.json` 에 찍고 읽습니다 | `step-done`(시험 줄) |
@@ -208,7 +210,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `session.mjs` | 66 | 훅 입력 읽기, 리더 세션 번호 적기, 컨텍스트 사용률 읽기입니다 | `status --hook`, `precompact`, `leader` |
 | `stale.mjs` | 51 | 낡은 시험 판정 파일을 읽고 시험 고치기를 허락할지 정합니다 | `worker start`, `ask --scene`, `advance close` |
 | `state.mjs` | 176 | 상태 파일, 파일 잠금, 사건 기록, 작업 중 표시입니다 | 모든 명령, `install.mjs`(진행 중 검사) |
-| `status.mjs` | 245 | 위치와 "다음 할 일" 문장을 만듭니다. 절차의 원본이 이 파일입니다 | `status`, `precompact`, `next` |
+| `status.mjs` | 246 | 위치와 "다음 할 일" 문장을 만듭니다. 절차의 원본이 이 파일입니다 | `status`, `precompact`, `next` |
 | `steps.mjs` | 85 | step 시작과 끝입니다 | `step-start`, `step-done` |
 | `usage.mjs` | 104 | 부품 쓰임 세기, 빼기 후보, 레일 크기 기록입니다 | `usage`, 모든 명령(크기 기록), `advance close` |
 | `verify.mjs` | 58 | 바깥 정답 검증기를 돌리고, 장면 질문 앞에서 그 기록을 봅니다 | `verify`, 장면 관문 |
@@ -241,8 +243,6 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `waiting_for` | `human`(사람 답을 기다림) 또는 `none` |
 | `human_ask` | 열린 질문 `{ q, kind, at, … }`. `kind` 는 `interview`, `approve`, `decide`, `scene`, `other`. 장면 되묻기면 `follow_up`, 앞 답에서 받은 `verdict`·`seen` 이 붙습니다 |
 | `interview.asked` | 인터뷰 질문 수 |
-| `gates.sheet_approved` | `advance decide` 때 읽은 기획서 승인 날짜(없으면 `null`) |
-| `gates.risks_decided[Mx]` | 마일스톤을 시작할 때 풀려 있던 착수 전 번호 목록 |
 | `gates.plan_marks[Mx]` | 마일스톤을 시작할 때 기획서 "결정과 시험"에 있던 번호(계획 밖 결정 수의 기준) |
 | `gates.unplanned[Mx]` | 닫을 때 센 계획 밖 결정 수 |
 | `gates.rehearsed[Mx]` | 리허설 `{ total, pass, failed[], at }` |
@@ -430,25 +430,25 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 ## 10. 크기
 
-이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-27, 개발 중 기능 추가 흐름을 보강한 뒤).
+이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-27, hbo-tube M3 리더가 낸 고칠 점을 반영한 뒤).
 
 | 묶음 | 파일 | 줄 |
 |---|---|---|
-| 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,897 (입구 69, 모듈 2,828) |
+| 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,896 (입구 69, 모듈 2,827) |
 | 레일 실행 코드: 훅 | `hooks/*.mjs` 4개 | 508 |
-| 레일 실행 코드 합 | | **3,405** (승인 뒤 더한 기능 줄 안내를 더하고 `rail_gap` 읽기를 빼서 1줄 줄어듦) |
+| 레일 실행 코드 합 | | **3,404** (`done` 의 기능 더하기 안내 1줄을 더하고, 아무도 읽지 않던 `gates.sheet_approved`·`gates.risks_decided` 쓰기 2줄을 빼서 1줄 줄어듦) |
 | 설치 도구 | `scripts/install.mjs` | 149 |
 | 스킬 | `skills/*/*.md` 5개 | 138 |
-| 시작 틀 | `templates/` 9개(`docs/RAIL.md` 38줄, `CLAUDE.md` 11줄 포함) | 235 |
-| 시험 | `tests/*.mjs` 24개(시험 파일 23개와 도우미) | 4,417 |
+| 시작 틀 | `templates/` 9개(`docs/RAIL.md` 38줄, `CLAUDE.md` 11줄 포함) | 236 |
+| 시험 | `tests/*.mjs` 25개(시험 파일 24개와 도우미) | 4,526 |
 
-시험 수는 275개이고, 맥에서 `npm test` 를 돌리면 274개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
+시험 수는 283개이고, 맥에서 `npm test` 를 돌리면 282개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
 
 ## 11. 코드가 보지 않는 것
 
 코드를 읽으며 확인한, 관문이 일부러 또는 아직 보지 않는 자리입니다. 고칠 것인지는 사람이 정합니다.
 
-- **기획서 승인.** `advance decide` 는 기획서가 있고 마일스톤 순서가 맞는지만 봅니다. `승인:` 줄이 없어도 넘어갑니다(`gates.mjs` 의 주석이 이것을 "다음 할 일"이 알려 준다고 밝힙니다).
+- **기획서 승인.** `advance decide` 는 기획서가 있고 마일스톤 순서가 맞는지만 봅니다. `승인:` 줄이 없어도 넘어갑니다(`gates.mjs` 의 주석이 이것을 "다음 할 일"이 알려 준다고 밝힙니다). 모든 마일스톤을 닫은 뒤 새 마일스톤을 더할 때도 승인 답을 코드가 가리지 않습니다. 주인의 고침 요구도 `approve` 답으로 남기 때문입니다.
 - **커밋 관문.** `step-done` 은 커밋 여부를 보지 않고, 커밋 관문은 기록도 남기지 않는 안내입니다. 코드가 막는 것은 마무리 검사 훅이 검사 명령을 돌리는 데까지입니다. 바뀐 파일이 "고쳐도 되는 파일" 안인지는 리더가 봅니다.
 - **리뷰 결과.** 리뷰·마지막 리뷰 작업자가 쓰는 `.rail/review/<step>.json` 을 읽는 코드가 없습니다. 스킬이 가리키는 `.rail/review/calibration.md` 를 만드는 틀도 없습니다.
 - **step 표가 아예 없을 때.** `advance check` 는 빈 표만 막고 파일이 없는 경우는 보지 않습니다(닫기 관문에서는 막힙니다).

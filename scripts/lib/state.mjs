@@ -25,7 +25,7 @@ export function defaultState() {
     waiting_for: 'none',
     human_ask: null,
     interview: { asked: 0 },
-    gates: { sheet_approved: null, risks_decided: {}, scene_checked: {}, rehearsed: {} },
+    gates: { scene_checked: {}, rehearsed: {} },
     closed: [],
     updated: null
   }

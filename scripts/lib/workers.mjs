@@ -161,7 +161,7 @@ export function workerStart(steps, flags, usage) {
       const pick = layout.ok ? chooseSplit(layout.json, leader, terms) : { create: true }
       if (pick.create) {
         const r = orca(['terminal', 'create', '--worktree', 'current', '--title', p.name, '--command', cmd, '--json'])
-        return { r, handle: findIn(r.json, 'handle', /^term_/), how: '새 탭' }
+        return { r, handle: findIn(r.json, 'handle', /^term_/), how: '새 탭', tab: true }
       }
       const base = ['terminal', 'split', '--terminal', pick.handle, '--direction', pick.direction, '--command', cmd, '--json']
       let r = orca(base)
@@ -201,7 +201,7 @@ export function workerStart(steps, flags, usage) {
       const data = { step: p.step, agent, role, terminal: term, dispatch, name: p.name, spec: path.relative(ROOT, p.spec).split(path.sep).join('/'), via: 'worker start', ...(wt ? { worktree: wt.worktree, branch: wt.branch } : {}), ...(g ? { test_edit: true, allowed_at: g.at, allowed_by: g.by, ...(g.by === 'stale' ? { stale_file: g.file, judged_by: g.judge, stale_lines: g.lines } : {}) } : {}) }
       appendLog('worker_start', st, data)
     })
-    out(`[작업자] ${p.step} 시작 — ${agent}, ${role}, 창 ${term} (${made.how}), 일 ${dispatch}, 이름 "${p.name}"${wt ? ` · worktree ${wt.worktree} (브랜치 ${wt.branch})${wt.untracked.length ? `\n[경고] main 의 커밋 안 된 새 파일은 worktree 에 없습니다: ${wt.untracked.join(', ')}` : ''}` : ''}${g ? (g.by === 'stale' ? ` · 판정으로 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.file}, 줄 ${g.lines.length}개)` : ` · 사람이 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.at} 답)`) : ''}`)
+    out(`[작업자] ${p.step} 시작 — ${agent}, ${role}, 창 ${term} (${made.how}), 일 ${dispatch}, 이름 "${p.name}"${made.tab ? `\n[새 탭] 리더 탭을 나누지 못해 새 탭 "${p.name}" 에 띄웠습니다. 주인에게 이 탭 이름을 한 줄로 알린다` : ''}${wt ? ` · worktree ${wt.worktree} (브랜치 ${wt.branch})${wt.untracked.length ? `\n[경고] main 의 커밋 안 된 새 파일은 worktree 에 없습니다: ${wt.untracked.join(', ')}` : ''}` : ''}${g ? (g.by === 'stale' ? ` · 판정으로 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.file}, 줄 ${g.lines.length}개)` : ` · 사람이 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.at} 답)`) : ''}`)
   }
   if (failed) process.exitCode = 1
 }

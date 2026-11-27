@@ -2,7 +2,7 @@
 import { loadConfig } from './config.mjs'
 import { fail, now, out } from './core.mjs'
 import { orca } from './orca.mjs'
-import { approvalDate, gradeLine, markClosed, nextOpenMilestone, readSheet, unplanned } from './docs.mjs'
+import { gradeLine, markClosed, nextOpenMilestone, readSheet, unplanned } from './docs.mjs'
 import { gate } from './gates.mjs'
 import { staleList, withCommit } from './stale.mjs'
 import { disabledParts } from './parts.mjs'
@@ -32,12 +32,10 @@ export function cmdCheck({ pos, flags }, advance) {
   let closedId = null
   let offAtClose = []
   if (target === 'decide') {
-    st.gates.sheet_approved = approvalDate(rm.text)
     st.stage = 'decide'
     st.milestone = flags.milestone
     st.step = null
   } else if (target === 'milestone') {
-    st.gates.risks_decided[st.milestone] = rm.ms.find((m) => m.id === st.milestone).risks
     st.gates.plan_marks = { ...st.gates.plan_marks, [st.milestone]: [...new Set(rm.marks.map((x) => x.id))] }
     st.stage = 'milestone'
   } else if (target === 'check') {
