@@ -1,4 +1,4 @@
-// .rail/config.json 읽기: 커밋 정책, 자율 모드 설정, 판 번호, 검증기 목록, 작업자 모델.
+// .rail/config.json 읽기: 커밋 정책, 자율 모드 설정, 검증기 목록, 작업자 모델. 그리고 설치한 레일 커밋.
 import { F, read } from './core.mjs'
 
 // isolation: worktree 면 만드는 역할의 작업자가 저마다 git worktree 에서 일한다(worktree.mjs). 사람만 바꾼다(--said).
@@ -60,9 +60,6 @@ export const verifiers = () => {
   const v = loadConfig().verify
   return Array.isArray(v) ? v.filter((x) => x && typeof x.name === 'string' && typeof x.command === 'string' && x.command.trim()) : []
 }
-// 레일 판 번호(status 머리에 보이는 이름표, 동작은 바꾸지 않는다). 없으면 null.
-export const railVersion = () => {
-  const v = loadConfig().railVersion
-  return (typeof v === 'string' || typeof v === 'number') && String(v).trim() ? String(v).trim() : null
-}
-export const versionLabel = () => (railVersion() ? `레일 ${railVersion()}판` : '레일 판 번호 없음')
+// 화면에 보이는 레일 판: 설치 도구가 .rail/installed.json 에 적은 레일 커밋(짧은 해시). 손으로 쓴 번호는 두지 않는다. 없으면 null.
+export const railVersion = () => { try { const i = JSON.parse(read(F.installed)); return typeof i?.commit === 'string' ? `${i.commit}${i.dirty ? ' 고친 판' : ''}` : null } catch { return null } }
+export const versionLabel = () => (railVersion() ? `레일 ${railVersion()}` : '레일 설치 기록 없음')

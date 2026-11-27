@@ -1,7 +1,9 @@
 // 작업자 띄우기와 닫기, 열린 작업자 읽기.
 import fs from 'node:fs'
 import path from 'node:path'
-import { ROOT, WIN, fail, lastLines, out, read, unquote } from './core.mjs'
+import { ROOT, WIN, fail, gitIn, lastLines, out, read, unquote } from './core.mjs'
+import { isTestPath } from '../../hooks/lib.mjs'
+import { readCheck } from './check.mjs'
 import { autonomyOn, workerModel } from './config.mjs'
 import { isSettled, orca } from './orca.mjs'
 import { isActive, isDone, readPlan } from './plan.mjs'
@@ -76,8 +78,10 @@ export function agentCommand(agent, name, testEdit = false, { win = WIN, cd = nu
 const EXT = WIN ? (process.env.PATHEXT ?? '.EXE;.CMD').split(';') : ['']
 export const onPath = (bin) => (process.env.PATH ?? '').split(path.delimiter).some((d) => d && EXT.some((x) => fs.existsSync(path.join(d, bin + x))))
 // 이 마일스톤에서 step 이름과 시험 고치기(RAIL_ALLOW_TEST_EDIT 또는 "시험 고치")가 든 질문에 사람이 허락했으면
-// { at, by: 'human' }. 허락 한 번에 작업자 하나다(그 뒤 test_edit 로 띄운 worker_start 가 있으면 다 쓴 것).
-// 사람 허락이 없고 staleTests 가 agent 면 판정 작업자의 판정을 본다(stale.mjs: 허락 또는 { refused }).
+// { at, by: 'human' }. 허락은 "네·맞음" 같은 답, 또는 질문 보기 가운데 "시험 고치"가 적힌 보기의 기호(A 등) 답이다(그 말이 없는 보기의 기호는 허락이 아니다).
+// 허락 한 번에 작업자 하나다(그 뒤 test_edit 로 띄운 worker_start 가 있으면 다 쓴 것).
+// 사람 허락이 없으면 이번 마일스톤에 생긴 시험(newTestGrant), 그다음 staleTests 가 agent 면 판정 작업자의 판정을 본다(stale.mjs: 허락 또는 { refused }).
+const picked = (q, a) => { const k = a.match(/^([A-Z])(?![\w-])/i)?.[1].toUpperCase(); return !!k && q.split(/(?:^|[\s(/·,])(?=[A-Z][\s).:：])/).some((p) => p.startsWith(k) && /^[A-Z][\s).:：]/.test(p) && /시험\s*고치/.test(p)) }
 export function testEditGrant(st, step) {
   const named = new RegExp(`(?:^|[^\\w-])${step}(?![\\w-])`)
   const ev = readEvents().filter((x) => x.milestone === st.milestone)
@@ -85,10 +89,20 @@ export function testEditGrant(st, step) {
   for (const e of ev) {
     const a = unquote(e.text ?? '')
     if (e.event === 'human_answer' && /RAIL_ALLOW_TEST_EDIT|시험\s*고치/.test(e.q) && named.test(e.q))
-      grant = /^(?:허락|고쳐|고치|진행|네|예|응|좋|그래|해|ok|yes)/i.test(a) && !/아니|안\s*(?:돼|되|됨|해)|말(?:아|고|자)|하지\s*마|다른\s*방법|거절/.test(a) ? e.t : null
+      grant = (/^(?:허락|고쳐|고치|진행|네|예|응|맞|좋|그래|해|ok|yes)/i.test(a) || picked(e.q, a)) && !/아니|안\s*(?:돼|되|됨|해)|말(?:아|고|자)|하지\s*마|다른\s*방법|거절/.test(a) ? e.t : null
     else if (e.event === 'worker_start' && e.step === step && e.test_edit) grant = null
   }
-  return grant ? { at: grant, by: 'human' } : staleGrant(st, step, ev)
+  return grant ? { at: grant, by: 'human' } : newTestGrant(step, ev) ?? staleGrant(st, step, ev)
+}
+// 고침 작업자 <step>-fix: 확인 기록(.rail/check/<step>.json)의 must 가 가리킨 시험 파일이 이번 마일스톤에 처음 생겼으면(아직 장면 판정 전, git 에 처음 들어간 때가 마일스톤 시작 뒤이거나 아직 커밋 전)
+// 사람에게 묻지 않고 그 작업자 하나에 한 번 허락한다. 그 밖의 시험은 지금 규칙(사람 허락, 판정)대로다.
+function newTestGrant(step, ev) {
+  const c = /-fix$/.test(step) ? readCheck(step.slice(0, -4)) : null
+  const start = Date.parse(ev.find((e) => e.event === 'stage_advance' && e.to === 'milestone')?.t ?? '') / 1000
+  if (!c?.must?.length || !(start > 0) || ev.some((e) => e.event === 'worker_start' && e.step === step && e.test_edit)) return null
+  const born = (f, r = gitIn(['log', '--diff-filter=A', '--format=%ct', '--', f])) => (r.ok ? Number(r.out.trim().split('\n').pop() || Infinity) : 0)
+  const files = [...new Set(JSON.stringify(c.must).match(/[\w.-]+(?:\/[\w.-]+)+|[\w-]+\.(?:test|spec)\.\w+/g) ?? [])].filter((f) => isTestPath(f) && !f.startsWith('.rail/') && fs.existsSync(path.join(ROOT, f)) && born(f) >= start)
+  return files.length ? { at: new Date(start * 1000).toISOString(), by: 'new-test', files } : null
 }
 // 일 이름: --name, 없으면 명세의 첫 "# " 제목(step 으로 시작하지 않으면 앞에 붙인다), 없으면 "<step> <role>".
 export function workName(step, role, spec, given) {
@@ -152,6 +166,8 @@ export function workerStart(steps, flags, usage) {
     if (p.grant?.refused) out(`[시험 고치기] ${p.step}: ${p.grant.refused}`)
     if (g?.by === 'stale' && !read(p.spec).includes(`(판정 ${g.file})`))
       fs.appendFileSync(p.spec, `\n\n## 고쳐도 되는 시험 줄 (레일이 붙임, 판정 ${g.file})\n${g.lines.map((l) => `- ${l.file}:${l.line} — ${l.changed_by} 로 바뀐 동작(옛 값: ${l.pinned})`).join('\n')}\n이 줄들만 새 동작에 맞게 고친다. 판정 파일의 keep 줄과 다른 시험은 고치지 말고, 걸리면 코드를 고치거나 worker_done 에 까닭을 적는다.\n`)
+    if (g?.by === 'new-test' && !read(p.spec).includes('(이번 마일스톤에 생긴 시험)'))
+      fs.appendFileSync(p.spec, `\n\n## 고쳐도 되는 시험 (레일이 붙임, 이번 마일스톤에 생긴 시험)\n${g.files.map((f) => `- ${f}`).join('\n')}\n확인 기록의 must 가 가리킨 이 파일만 고친다. 다른 시험은 고치지 말고, 걸리면 코드를 고치거나 worker_done 에 까닭을 적는다.\n`)
     const cmd = agentCommand(agent, p.name, !!g, { cd: wt?.worktree, model: workerModel(role) })
     // 창 고르기와 나누기는 잠금 안에서 한다(동시에 불린 두 명령이 같은 창을 나누지 않게).
     const made = withLock(() => {
@@ -220,10 +236,10 @@ export function workerStart(steps, flags, usage) {
     }
     withLock(() => {
       const st = loadState()
-      const data = { step: p.step, agent, role, terminal: term, dispatch, name: p.name, spec: path.relative(ROOT, p.spec).split(path.sep).join('/'), via: 'worker start', ...(wt ? { worktree: wt.worktree, branch: wt.branch } : {}), ...(g ? { test_edit: true, allowed_at: g.at, allowed_by: g.by, ...(g.by === 'stale' ? { stale_file: g.file, judged_by: g.judge, stale_lines: g.lines } : {}) } : {}) }
+      const data = { step: p.step, agent, role, terminal: term, dispatch, name: p.name, spec: path.relative(ROOT, p.spec).split(path.sep).join('/'), via: 'worker start', ...(wt ? { worktree: wt.worktree, branch: wt.branch } : {}), ...(g ? { test_edit: true, allowed_at: g.at, allowed_by: g.by, ...(g.by === 'stale' ? { stale_file: g.file, judged_by: g.judge, stale_lines: g.lines } : {}), ...(g.files ? { new_tests: g.files } : {}) } : {}) }
       appendLog('worker_start', st, data)
     })
-    out(`[작업자] ${p.step} 시작 — ${agent}, ${role}, 창 ${term} (${made.how}), 일 ${dispatch}, 이름 "${p.name}"${made.tab ? `\n[새 탭] 리더 탭을 나누지 못해 새 탭 "${p.name}" 에 띄웠습니다. 주인에게 이 탭 이름을 한 줄로 알린다` : ''}${wt ? ` · worktree ${wt.worktree} (브랜치 ${wt.branch})${wt.untracked.length ? `\n[경고] main 의 커밋 안 된 새 파일은 worktree 에 없습니다: ${wt.untracked.join(', ')}` : ''}` : ''}${g ? (g.by === 'stale' ? ` · 판정으로 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.file}, 줄 ${g.lines.length}개)` : ` · 사람이 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.at} 답)`) : ''}`)
+    out(`[작업자] ${p.step} 시작 — ${agent}, ${role}, 창 ${term} (${made.how}), 일 ${dispatch}, 이름 "${p.name}"${made.tab ? `\n[새 탭] 리더 탭을 나누지 못해 새 탭 "${p.name}" 에 띄웠습니다. 주인에게 이 탭 이름을 한 줄로 알린다` : ''}${wt ? ` · worktree ${wt.worktree} (브랜치 ${wt.branch})${wt.untracked.length ? `\n[경고] main 의 커밋 안 된 새 파일은 worktree 에 없습니다: ${wt.untracked.join(', ')}` : ''}` : ''}${g ? (g.by === 'stale' ? ` · 판정으로 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.file}, 줄 ${g.lines.length}개)` : g.files ? ` · 이번 마일스톤에 생긴 시험이라 묻지 않고 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.files.join(', ')})` : ` · 사람이 허락한 시험 고치기(RAIL_ALLOW_TEST_EDIT=1, ${g.at} 답)`) : ''}`)
   }
   if (failed) process.exitCode = 1
 }

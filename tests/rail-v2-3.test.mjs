@@ -207,7 +207,8 @@ describe('Windows 의 orca.cmd 부르기', () => {
 describe('레일 크기 (rail_size)', () => {
   function sizeRoot(version, log = '') {
     const root = tmp('rail23s-')
-    put(root, '.rail/config.json', JSON.stringify({ railVersion: version }))
+    put(root, '.rail/config.json', '{}')
+    put(root, '.rail/installed.json', JSON.stringify({ commit: version }))
     put(root, '.rail/state.json', JSON.stringify({ project: 'demo', stage: 'done', milestone: null, closed: [] }))
     put(root, '.rail/bin/a.mjs', 'a\n'.repeat(60))
     put(root, '.rail/hooks/h.mjs', 'h\n'.repeat(40))
@@ -219,13 +220,13 @@ describe('레일 크기 (rail_size)', () => {
   }
   const sizes = (root) => events(root).filter((e) => e.event === 'rail_size')
 
-  test('판 번호가 바뀌는 첫 명령 때 한 번 레일 줄 수를 남긴다(레일 스킬만, validate 는 쓰지 않음)', () => {
+  test('설치한 레일 커밋이 바뀌는 첫 명령 때 한 번 레일 줄 수를 남긴다(레일 스킬만, validate 는 쓰지 않음)', () => {
     const root = sizeRoot('2.3')
     ok(run(root, ['status']))
     ok(run(root, ['status']))
     assert.equal(sizes(root).length, 1)
     assert.deepEqual([sizes(root)[0].version, sizes(root)[0].lines, sizes(root)[0].files], ['2.3', 112, 4])
-    put(root, '.rail/config.json', JSON.stringify({ railVersion: '2.4' }))
+    put(root, '.rail/installed.json', JSON.stringify({ commit: '2.4' }))
     ok(run(root, ['status']))
     assert.deepEqual(sizes(root).map((e) => e.version), ['2.3', '2.4'])
     assert.deepEqual(sizes(root)[1].prev, { version: '2.3', lines: 112 })

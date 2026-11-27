@@ -49,13 +49,20 @@ export function cardHint(d, m, st) {
   return `기획서 ${id} 줄 아래에 후보 2~3개(하나는 가장 단순한 안, 후보마다 결과와 깨지는 장면 한 줄)와 추천을 붙여 보이고 ask "${id} 는 A/B/C 중 무엇으로 할까요? (추천대로도 됩니다)" --kind decide 로 묻고 턴을 끝내기. 봐야 아는 결정이면 먼저 docs/decisions/${id}-<이름>.md 시제품 카드("# ${id} (질문 제목)" / "마일스톤: ${m}" / "시제품: 예" / "## 질문" / "## 변주"(- p1-이름: 한두 줄, 2~3개) / "## 스크린샷"(- d-1124.png: 2026-11-24, 데스크톱 폭 1280))를 쓰고 /rail 을 다시 본다. ${after}`
 }
 // 닫기 전에 할 것: 기획서 "## 살아 있는 세 줄"을 이 마일스톤 동안 고치지 않았으면 고치기(장면 확인으로 갈 때 남긴 지문과 같으면 안 고친 것,
-// 지문이 없는 옛 기록이면 줄에 Mx 가 있는지 본다), CLAUDE.md 코드 지도 맞추기. 관문은 아니고 다음 할 일만 알려 준다. 계획 밖 결정 수는 코드가 센 값(docs.mjs unplanned)을 적게 한다.
+// 지문이 없는 옛 기록이면 줄에 Mx 가 있는지 본다), 결정 접기, CLAUDE.md 코드 지도 맞추기, 크기 줄. 관문은 아니고 다음 할 일만 알려 준다. 계획 밖 결정 수는 코드가 센 값(docs.mjs unplanned)을 적게 한다.
+// 크기 기준(KB, 넘으면 "접기·옮기기 대상"이라고만 붙인다. 막지 않는다).
+const SIZE_MAX = { 'CLAUDE.md': 6, '결정과 시험': 15 }
+const kb = (name, t) => `${name} ${(Buffer.byteLength(t) / 1024).toFixed(1)}KB${Buffer.byteLength(t) > (SIZE_MAX[name] ?? Infinity) * 1024 ? ' 접기·옮기기 대상' : ''}`
+export const sizeLine = (sh) => `크기(막지 않음): 기획서 ${['성공 장면', '결정과 시험', '화면', '살아 있는 세 줄'].map((n) => kb(n, (sh?.text ?? '').split(/\n(?=## )/).filter((x) => x.startsWith(`## ${n}`)).join('\n'))).join(' · ')} · ${kb('CLAUDE.md', read(F.claude) ?? '')}`
 const beforeClose = (sh, m, st) => {
   const mark = readEvents().findLast((e) => e.event === 'stage_advance' && e.to === 'check' && e.milestone === m)?.living
   const g = unplanned(st, sh)
   const living = (mark ? mark !== livingMark(sh) : new RegExp(`\\b${m}\\b`).test(sh?.living.join('\n') ?? '')) ? '' : `기획서 "## 살아 있는 세 줄"을 ${m} 기준으로 고친다(- 깨진 가정: / - 계획 밖 결정: ${g?.id === m ? `누적 ${g.total}번 (${m} ${g.now})` : `<누적 N번> (${m} <이번 수>)`} · 계획 변경: / - 다음 장면:). "## 나중에" 도 본다. `
+  const base = st.gates.plan_marks?.[m]
+  const fold = (sh?.marks ?? []).filter((x) => !x.line.includes('docs/decisions/') && ((sh.ms.find((y) => y.id === m)?.risks ?? []).includes(x.id) || (base && !base.includes(x.id)) || /결정\s*[:：]\s*바뀜/.test(x.line))).map((x) => x.id)
+  const folding = fold.length ? `결정 접기(${[...new Set(fold)].join(', ')}) — 줄마다 아래 후보 줄(들여쓴 "  - A …")과 긴 설명을 docs/decisions/<번호>-<짧은 이름>.md 에 글자 그대로 옮기고(시제품 카드가 있으면 그 파일 끝에 덧붙인다), 기획서 줄에는 번호·상태 말(코드가 읽는 "결정: 선택함 (…)" 등 그대로)·고른 것·다시 볼 조건·"상세: docs/decisions/<파일>" 만 남긴다. 다른 결정이 바꾼 옛 결정은 "결정: 바뀜 (→ D-xx) · 상세: <파일>" 한 줄만. ` : ''
   const map = section(read(F.claude) ?? '', /코드\s*지도/).join('\n')
-  return `먼저 ${living}CLAUDE.md "## 코드 지도" 를 이번까지 만든 코드에 맞게 ${!map.trim() || /<[^>]+>/.test(map) ? '만든다' : '고친다'}(폴더·모듈마다 맡은 일 한 줄, 자료 길 하나, 깨면 안 되는 약속, 15줄 안쪽, 까닭은 결정 번호만). 그다음 `
+  return `먼저 ${living}${folding}CLAUDE.md "## 코드 지도" 를 이번까지 만든 코드에 맞게 ${!map.trim() || /<[^>]+>/.test(map) ? '만든다' : '고친다'}(폴더·모듈마다 맡은 일 한 줄, 자료 길 하나, 깨면 안 되는 약속, 15줄 안쪽, 까닭은 결정 번호만). CLAUDE.md 는 모든 세션·작업자가 처음 읽는다. 지금 사실만 한 번 적고, 같은 사실이 기획서·코드에 있으면 가리키기만 하며, 명령 옵션 설명은 스크립트 도움말로 옮긴다. 레일이 고쳐서 필요 없어진 배운 규칙, 기계 검사로 바뀐 배운 규칙은 닫을 때 지운다. ${sizeLine(sh)}. 그다음 `
 }
 // 표 승인 질문. 기획서의 "- 걸리는 시험: <파일> — …" 파일이 표의 어느 줄 "고쳐도 되는 파일" 안이면 그 step 의 시험 고치기 허락을 같은 질문에 묶는다.
 const lockedTests = (rm) => (rm?.scenes ?? []).flatMap((s) => s.body.map((l) => l.match(/^\s*[-*]\s*걸리는\s*시험\s*[:：]\s*`?([^\s`,]+)/)?.[1]).filter(Boolean))
@@ -161,7 +168,7 @@ export function describe(st) {
       next = `장면 확인 전에 — ${before[0]}${/리허설/.test(before[0]) ? (rehearsing ? `. 리허설 작업자의 worker_done 이 오면 worker done ${m}-rehearsal` : `. ${SCENE_PREP(m)}`) : ''}`
     // 판이 바뀌기 전에 연 장면 질문은 지금 판의 문구(답의 꼴과 예시가 든)로 바꿔 묻는다.
     else if (!sc && ask && ['scene', 'approve'].includes(ask.kind) && !ask.follow_up && ask.q !== sceneQuestion(st))
-      next = `질문을 바꿔 묻기 — 열린 장면 질문이 ${versionLabel()}의 문구가 아닙니다. ask --scene --replace 로 바꿔 묻고 턴을 끝내기`
+      next = `질문을 바꿔 묻기 — 열린 장면 질문이 지금 판(${railVersion() ?? '설치 기록 없음'})의 문구가 아닙니다. ask --scene --replace 로 바꿔 묻고 턴을 끝내기`
     else if (!sc && ask?.kind === 'scene') next = '사람의 장면 답 기다리기 — 답이 오면 answer "<답 그대로>" (판정과 본 것은 스크립트가 가릅니다. [다시 묻기] 가 나오면 그 질문만 그대로 한 번 더 묻고 턴을 끝내기)'
     else if (!sc && rh && selfFix(st).ok)
       next = `스스로 고치기 (${selfFix(st).n + 1}/${SELF_FIX_MAX}) — 리허설 실패 ${rh.failed.map((f) => f.id).join(', ')} 는 기계로 가릴 수 있는 항목이라 사람에게 묻기 전에 고칩니다: reopen --self-fix, 그다음 고칠 줄을 더하고 다시 리허설`

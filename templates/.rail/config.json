@@ -1,5 +1,4 @@
 {
-  "railVersion": "2.9",
   "checkCommand": "node --test",
   "commitPolicy": "auto-local",
   "appStart": "",

@@ -98,7 +98,7 @@ describe('장면 질문과 답 (2.1판)', () => {
   test('장면 질문은 판이 정한 문구로, 답의 꼴과 리허설의 실제 숫자를 예시로 든다. 옛 문구가 열려 있으면 status 가 바꿔 묻기를 알린다', () => {
     const root = checkStage()
     ok(rail(root, 'ask', '리허설 결과를 보시고 됨/안 됨을 알려 주세요', '--kind', 'approve'))
-    assert.match(rail(root, 'status').out, /다음 할 일: 질문을 바꿔 묻기 — 열린 장면 질문이 레일 2\.1판의 문구가 아닙니다/)
+    assert.match(rail(root, 'status').out, /다음 할 일: 질문을 바꿔 묻기 — 열린 장면 질문이 지금 판\(설치 기록 없음\)의 문구가 아닙니다/)
     const r = rail(root, 'ask', '--scene', '--replace')
     ok(r)
     const q = state(root).human_ask.q

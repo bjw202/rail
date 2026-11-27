@@ -16,6 +16,7 @@ export const F = {
   decisions: path.join(ROOT, 'docs/decisions'),
   plan: path.join(ROOT, 'docs/plan'),
   config: path.join(ROOT, '.rail/config.json'),
+  installed: path.join(ROOT, '.rail/installed.json'),
   railDoc: path.join(ROOT, 'docs/RAIL.md'),
   baseline: path.join(ROOT, BASELINE),
   rehearsal: path.join(ROOT, '.rail/rehearsal'),
