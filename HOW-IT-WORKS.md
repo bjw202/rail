@@ -195,7 +195,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `baseline.mjs` | 30 | 시험 파일 목록과 해시를 `.rail/test-baseline.json` 에 찍고 읽습니다 | `step-done`(시험 줄) |
 | `budget.mjs` | 91 | 비용 명령을 불러 예산 규칙 셋을 잽니다 | `next`, `status`(경고 문구) |
 | `check.mjs` | 52 | 기능 줄의 확인 기록을 읽고, 기능 줄이 어디까지 왔는지 판정합니다 | `step-done`, `status` |
-| `config.mjs` | 66 | `.rail/config.json` 을 읽어 정책·자율 설정·검증기·판 번호를 줍니다 | 거의 모든 명령 |
+| `config.mjs` | 68 | `.rail/config.json` 을 읽어 정책·자율 설정·검증기·판 번호·작업자 모델(`workerModels`)을 줍니다 | 거의 모든 명령 |
 | `core.mjs` | 83 | 저장소 경로, 파일 읽기, 출력과 실패, git 호출, 날짜·돈 형식입니다. 다른 레일 모듈을 가져오지 않습니다 | 모든 모듈 |
 | `docs.mjs` | 107 | 기획서 `docs/PLAN.md` 를 읽어 성공 장면, 결정과 시험, 마일스톤 지도, 살아 있는 세 줄을 꺼내고 착수 전 판정과 계획 밖 결정 수를 셉니다 | `status`, `advance`, `plan approve`, `proto`, `next` |
 | `gates.mjs` | 88 | 단계 순서 검사, 닫기 관문, step 시작·끝 관문입니다 | `check`, `advance`, `step-start`, `step-done` |
@@ -214,7 +214,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `steps.mjs` | 85 | step 시작과 끝입니다 | `step-start`, `step-done` |
 | `usage.mjs` | 104 | 부품 쓰임 세기, 빼기 후보, 레일 크기 기록입니다 | `usage`, 모든 명령(크기 기록), `advance close` |
 | `verify.mjs` | 58 | 바깥 정답 검증기를 돌리고, 장면 질문 앞에서 그 기록을 봅니다 | `verify`, 장면 관문 |
-| `workers.mjs` | 249 | 작업자 창 고르기·띄우기·닫기, 열린 작업자 읽기, 시험 고치기 허락입니다 | `worker`, 그리고 열린 작업자를 보는 거의 모든 곳 |
+| `workers.mjs` | 250 | 작업자 창 고르기·띄우기·닫기, 열린 작업자 읽기, 시험 고치기 허락입니다 | `worker`, 그리고 열린 작업자를 보는 거의 모든 곳 |
 | `worktree.mjs` | 132 | 작업자마다 git worktree 만들기·합치기·지우기입니다 | `worktree`, `worker`, `step-done`, `advance close`, `install.mjs`(커밋 안 된 변경 검사) |
 
 ### `hooks/*.mjs`
@@ -224,7 +224,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `guard-tests.mjs` | 208 | 시험 파일 잠금 | Claude Code 의 PreToolUse 훅 |
 | `stop-check.mjs` | 205 | 마무리 검사 | Claude Code 의 Stop 훅 |
 | `pre-compact.mjs` | 18 | `rail.mjs precompact` 를 불러 압축 요약 지시를 냅니다 | Claude Code 의 PreCompact 훅 |
-| `lib.mjs` | 77 | 훅 공용: 표준 입력 JSON, git 호출, 시험 경로 규칙(`isTestPath`), 기준선 파일 이름, 사건 남기기(`railLog`) | 위 세 훅, 그리고 `core.mjs`·`baseline.mjs`·`steps.mjs`·`worktree.mjs` |
+| `lib.mjs` | 91 | 훅 공용: 표준 입력 JSON, git 호출, 비교용 경로 맞추기(`canonPath`), 시험 경로 규칙(`isTestPath`), 기준선 파일 이름, 사건 남기기(`railLog`) | 위 세 훅, 그리고 `core.mjs`·`baseline.mjs`·`steps.mjs`·`worktree.mjs` |
 
 세션 시작 훅 두 개는 따로 파일이 없고 `rail.mjs status --hook` 을 부릅니다.
 
@@ -419,6 +419,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 명령 허용 줄 | `Bash(node .rail/bin/rail.mjs *)` 등 네 줄이 모두 들어갑니다 | 같은 네 줄(`Bash`·`PowerShell` 마다 `/` 판과 `\` 판). 역슬래시 규칙이 실제로 맞는지는 코드에서 확인 못 함 | `install.mjs` 의 `RAIL_ALLOW` |
 | Git Bash | 해당 없음 | 못 찾으면 설치는 하고 경고를 냅니다. 찾는 곳: `CLAUDE_CODE_GIT_BASH_PATH`, PATH 의 `bash.exe`(System32 의 것 빼고)와 `git.exe` 옆 `..\bin\bash.exe`, `Program Files`·`LOCALAPPDATA\Programs` 아래 `Git\bin\bash.exe` | `install.mjs:hasGitBash` |
 | 시험 잠금 | Bash 도구의 명령을 봅니다(이스케이프 `\`, heredoc 걷기) | PowerShell 도구 명령도 봅니다(이스케이프 `` ` ``, 경로의 `\` 는 구분자, cmdlet 과 별칭은 대소문자 무시) | `hooks/guard-tests.mjs:tokenize`, `targetsOf` |
+| 시험 잠금의 경로 맞추기 | 실제 경로(realpath)로 풀어 견줍니다(맥 임시 폴더 `/var` → `/private/var` 같은 링크) | Git Bash 꼴(`/c/`, `/cygdrive/c/`, `/mnt/c/`)을 `C:\` 로 바꾸고, 8.3 짧은 이름과 대소문자를 실제 경로로 풉니다. 없는 파일은 있는 가장 가까운 상위 폴더까지만 풉니다. 비교는 소문자로, `git ls-files` 에는 `:(icase)` 를 붙입니다 | `hooks/lib.mjs:canonPath`, `toRepoRel`, `guard-tests.mjs:tracked` |
 | 작업자 명령 | `cd '…' && RAIL_ALLOW_TEST_EDIT=1 claude …` (sh 따옴표) | `cd '…'; $env:RAIL_ALLOW_TEST_EDIT='1'; claude …` (PowerShell 따옴표). Orca 창의 셸이 cmd.exe 면 맞지 않습니다 | `workers.mjs:agentCommand`, `shq` |
 | Orca 부르기 | `orca` 를 바로 부릅니다 | `orca.cmd` 는 배치 파일이라 `cmd.exe` 를 거쳐 부르고, 인자의 특수 글자를 두 번 막습니다. 줄바꿈 든 `--body` 는 표준 입력(`--body-file -`)으로 보냅니다 | `orca.mjs:viaCmd` |
 | 명령 찾기 | PATH 만 봅니다 | PATH × `PATHEXT`(`.EXE`, `.CMD` …)를 봅니다(`codex` 가 있는지 등) | `workers.mjs:onPath` |
@@ -430,19 +431,19 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 ## 10. 크기
 
-이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-27, hbo-tube M3 리더가 낸 고칠 점을 반영한 뒤).
+이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-27, Windows 실사용에서 나온 고칠 점을 반영한 뒤).
 
 | 묶음 | 파일 | 줄 |
 |---|---|---|
-| 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,896 (입구 69, 모듈 2,827) |
-| 레일 실행 코드: 훅 | `hooks/*.mjs` 4개 | 508 |
-| 레일 실행 코드 합 | | **3,404** (`done` 의 기능 더하기 안내 1줄을 더하고, 아무도 읽지 않던 `gates.sheet_approved`·`gates.risks_decided` 쓰기 2줄을 빼서 1줄 줄어듦) |
+| 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,899 (입구 69, 모듈 2,830) |
+| 레일 실행 코드: 훅 | `hooks/*.mjs` 4개 | 522 |
+| 레일 실행 코드 합 | | **3,421** (시험 잠금의 경로 맞추기 `canonPath`·소문자 비교 14줄, 작업자 모델 `workerModels` 3줄을 더해 17줄 늘어남) |
 | 설치 도구 | `scripts/install.mjs` | 149 |
 | 스킬 | `skills/*/*.md` 5개 | 138 |
 | 시작 틀 | `templates/` 9개(`docs/RAIL.md` 38줄, `CLAUDE.md` 11줄 포함) | 236 |
-| 시험 | `tests/*.mjs` 25개(시험 파일 24개와 도우미) | 4,526 |
+| 시험 | `tests/*.mjs` 25개(시험 파일 24개와 도우미) | 4,582 |
 
-시험 수는 283개이고, 맥에서 `npm test` 를 돌리면 282개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
+시험 수는 맥에서 285개이고, `npm test` 를 돌리면 284개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). Windows 에서만 도는 시험 잠금 경로 묶음(Git Bash 꼴, 8.3 짧은 이름, 대소문자) 6개는 맥에서는 묶음째 건너뛰어 수에 들지 않습니다. 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
 
 ## 11. 코드가 보지 않는 것
 

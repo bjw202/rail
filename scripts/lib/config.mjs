@@ -1,4 +1,4 @@
-// .rail/config.json 읽기: 커밋 정책, 자율 모드 설정, 판 번호, 검증기 목록.
+// .rail/config.json 읽기: 커밋 정책, 자율 모드 설정, 판 번호, 검증기 목록, 작업자 모델.
 import { F, read } from './core.mjs'
 
 // isolation: worktree 면 만드는 역할의 작업자가 저마다 git worktree 에서 일한다(worktree.mjs). 사람만 바꾼다(--said).
@@ -15,6 +15,8 @@ export const commitPolicy = () => {
   const v = loadConfig()[POLICIES.commit.key]
   return POLICIES.commit.values.includes(v) ? v : POLICIES.commit.default
 }
+// 작업자 역할별 Claude 모델(workerModels): 역할 → default → opus. Codex 작업자에는 쓰지 않는다.
+export const workerModel = (role, m = loadConfig().workerModels ?? {}) => [m[role], m.default].find((v) => typeof v === 'string' && v.trim())?.trim() ?? 'opus'
 export const isolation = () => (loadConfig().isolation === 'worktree' ? 'worktree' : 'shared')
 // 자율 모드. 커밋 정책처럼 사람만 바꾼다(policy set autonomy on|off). 기본 off.
 // 예산 규칙 셋은 저마다 켜고 끈다: 마지막 진척 뒤 지출, 지난 마일스톤 비용 중간값의 몇 배, 하루 상한.

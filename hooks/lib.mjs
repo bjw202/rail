@@ -1,6 +1,6 @@
 // 두 가드 훅이 함께 쓰는 도우미: 표준 입력 JSON 읽기와 git 호출. 내장 모듈만 쓴다.
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -26,15 +26,29 @@ export function git(cwd, args, opts = {}) {
   return { ok: r.status === 0, out: r.stdout ?? '' }
 }
 
+// 비교용 경로. Windows 에서는 Git Bash 꼴(/c/, /cygdrive/c/, /mnt/c/)을 C:\ 로 바꾸고, 8.3 짧은 이름과 대소문자를
+// 실제 경로로 푼다(realpath). 없는 파일은 있는 가장 가까운 상위 폴더까지만 풀고 나머지를 붙인다.
+export const WIN = process.platform === 'win32'
+export const caseKey = (s) => (WIN ? s.toLowerCase() : s)
+const drive = (p) => (WIN ? p.replace(/^\/(?:cygdrive\/|mnt\/)?([a-z])(?=\/|$)/i, '$1:/') : p)
+export function canonPath(...parts) {
+  const p = path.resolve(...parts.map(drive))
+  try {
+    return realpathSync.native(p)
+  } catch {
+    return path.dirname(p) === p ? p : path.join(canonPath(path.dirname(p)), path.basename(p))
+  }
+}
+
 // 저장소 맨 위 폴더. git 저장소가 아니면 null.
 export function repoRoot(cwd) {
   const r = git(cwd, ['rev-parse', '--show-toplevel'])
-  return r.ok ? path.resolve(r.out.trim()) : null
+  return r.ok ? canonPath(r.out.trim()) : null
 }
 
-// 저장소 기준 상대 경로를 슬래시로 쓴다(Windows에서도 같은 꼴로 비교하려고).
-export function toRepoRel(root, absolute) {
-  return path.relative(root, absolute).split(path.sep).join('/')
+// 저장소 기준 상대 경로(cwd 에서 p). 슬래시로 쓰고 Windows 에서는 소문자로 맞춘다(같은 꼴로 비교하려고).
+export function toRepoRel(root, cwd, p) {
+  return caseKey(path.relative(root, canonPath(cwd, p)).split(path.sep).join('/'))
 }
 
 // 잠글 시험 경로인가: tests/**, test/**, fixtures/**(사람이 넣은 시험지), **/__tests__/**, **/*.test.*, **/*.spec.*

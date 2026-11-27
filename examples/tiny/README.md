@@ -6,12 +6,24 @@
 
 이 폴더를 그대로 쓰지 말고 빈 곳에 복사해서 돌립니다(레일은 `.rail/state.json`·`.rail/log.jsonl` 같은 실행 기록을 남깁니다).
 
+맥·리눅스(터미널):
+
 ```sh
 cp -R examples/tiny ~/tmp/tiny
 cd ~/tmp/tiny && git init -q
 rail-install   # 또는 node <레일 원본>/scripts/install.mjs ~/tmp/tiny
 git add -A && git commit -qm init
 node .rail/bin/rail.mjs status   # 위치: 기획 · 기획서 (질문 0)
+```
+
+Windows(PowerShell):
+
+```powershell
+Copy-Item -Recurse examples\tiny $HOME\tmp\tiny
+cd $HOME\tmp\tiny; git init -q
+rail-install   # 또는 node <레일 원본>\scripts\install.mjs $HOME\tmp\tiny
+git add -A; git commit -qm init
+node .rail\bin\rail.mjs status   # 위치: 기획 · 기획서 (질문 0)
 ```
 
 그다음은 `status` 의 "다음 할 일"을 그대로 따릅니다. 사람의 답은 `ask` / `answer` 로 남깁니다.

@@ -386,6 +386,22 @@ describe('worker start / done', () => {
     assert.equal(agentCommand('codex', 'x', false, { win: true }), 'codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false')
   })
 
+  test('작업자 모델은 workerModels 의 역할 → default → opus 순으로 고르고, 셸에 위험한 값은 따옴표로 싼다', async () => {
+    const { root, orca } = workerRoot()
+    const cfg = JSON.parse(readFileSync(path.join(root, '.rail/config.json'), 'utf8'))
+    writeFileSync(path.join(root, '.rail/config.json'), JSON.stringify({ ...cfg, workerModels: { default: 'opus[1m]', check: 'sonnet' } }))
+    ok(run(root, ['step-start', 'M0-1'], orca.env))
+    ok(run(root, ['worker', 'start', 'M0-1', '--agent', 'claude', '--role', 'check'], orca.env))
+    ok(run(root, ['step-start', 'M0-2a'], orca.env))
+    ok(run(root, ['worker', 'start', 'M0-2a', '--agent', 'claude', '--role', 'impl'], orca.env))
+    const [a, b] = sub(orca.calls(), 'terminal', 'split').map((c) => opt(c, '--command'))
+    assert.match(a, /^claude --model sonnet /)
+    assert.ok(b.startsWith(`claude --model ${q('opus[1m]')} `), b)
+    const { agentCommand } = await import('../scripts/lib/workers.mjs')
+    assert.equal(agentCommand('claude', 'x', false, { win: false, model: "a'b" }), `claude --model 'a'\\''b' --dangerously-skip-permissions --name 'x'`)
+    assert.equal(agentCommand('codex', 'x', false, { win: false, model: 'sonnet' }), 'codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false')
+  })
+
   test('codex 가 PATH 에 없으면 Claude 작업자로 대신 띄우고 경고와 codex_missing 을 남긴다', () => {
     const { root, orca } = workerRoot()
     const bin = path.join(root, 'bin-no-codex')

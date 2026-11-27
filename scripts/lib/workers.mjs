@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { ROOT, fail, lastLines, out, read, unquote } from './core.mjs'
+import { workerModel } from './config.mjs'
 import { isSettled, orca } from './orca.mjs'
 import { isActive, isDone, readPlan } from './plan.mjs'
 import { staleGrant } from './stale.mjs'
@@ -68,10 +69,10 @@ const WIN = process.platform === 'win32'
 // Orca 창에 넣는 작업자 명령. 셸 문법이 다르므로 Windows 는 PowerShell(5.1·7), 그 밖은 sh 계열(bash·zsh)로 쓴다.
 // 작업자는 무인 진행을 위해 권한 확인을 끄고 뜬다(README "안전장치").
 export const shq = (s, win = WIN) => (win ? `'${String(s).replace(/'/g, "''")}'` : `'${String(s).replace(/'/g, `'\\''`)}'`)
-export function agentCommand(agent, name, testEdit = false, { win = WIN, cd = null } = {}) {
+export function agentCommand(agent, name, testEdit = false, { win = WIN, cd = null, model = 'opus' } = {}) {
   const pre = `${cd ? `cd ${shq(cd, win)}${win ? '; ' : ' && '}` : ''}${testEdit ? (win ? "$env:RAIL_ALLOW_TEST_EDIT='1'; " : 'RAIL_ALLOW_TEST_EDIT=1 ') : ''}`
   if (agent === 'codex') return `${pre}codex --dangerously-bypass-approvals-and-sandbox -c check_for_update_on_startup=false`
-  return `${pre}claude --model opus --dangerously-skip-permissions --name ${shq(name, win)}`
+  return `${pre}claude --model ${/^[\w.-]+$/.test(model) ? model : shq(model, win)} --dangerously-skip-permissions --name ${shq(name, win)}`
 }
 const EXT = WIN ? (process.env.PATHEXT ?? '.EXE;.CMD').split(';') : ['']
 export const onPath = (bin) => (process.env.PATH ?? '').split(path.delimiter).some((d) => d && EXT.some((x) => fs.existsSync(path.join(d, bin + x))))
@@ -152,7 +153,7 @@ export function workerStart(steps, flags, usage) {
     if (p.grant?.refused) out(`[시험 고치기] ${p.step}: ${p.grant.refused}`)
     if (g?.by === 'stale' && !read(p.spec).includes(`(판정 ${g.file})`))
       fs.appendFileSync(p.spec, `\n\n## 고쳐도 되는 시험 줄 (레일이 붙임, 판정 ${g.file})\n${g.lines.map((l) => `- ${l.file}:${l.line} — ${l.changed_by} 로 바뀐 동작(옛 값: ${l.pinned})`).join('\n')}\n이 줄들만 새 동작에 맞게 고친다. 판정 파일의 keep 줄과 다른 시험은 고치지 말고, 걸리면 코드를 고치거나 worker_done 에 까닭을 적는다.\n`)
-    const cmd = agentCommand(agent, p.name, !!g, { cd: wt?.worktree })
+    const cmd = agentCommand(agent, p.name, !!g, { cd: wt?.worktree, model: workerModel(role) })
     // 창 고르기와 나누기는 잠금 안에서 한다(동시에 불린 두 명령이 같은 창을 나누지 않게).
     const made = withLock(() => {
       const st = loadState()

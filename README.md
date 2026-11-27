@@ -118,7 +118,7 @@ cd C:\projects\my-app
 rail-install
 ```
 
-대상은 git 레포의 맨 위 폴더여야 합니다. git 레포가 아닌 폴더, 레포의 하위 폴더, 레일 원본 폴더에서 치면 아무것도 깔지 않고 이유를 알려 줍니다. 설치는 Node 만으로 돌고 셸 명령을 쓰지 않으므로 맥과 Windows 에서 같은 명령입니다. 출력에 새로 만들거나 바꾼 파일이 한 줄씩 나옵니다.
+대상은 git 레포의 맨 위 폴더여야 합니다. git 레포가 아닌 폴더, 레포의 하위 폴더, 레일 원본 폴더에서 치면 아무것도 깔지 않고 이유를 알려 줍니다. 설치는 Node 만으로 돌고 셸 명령을 쓰지 않으므로 맥과 Windows 에서 같은 명령입니다. Windows 에서 경로의 드라이브 문자는 대소문자가 달라도 됩니다(`c:\projects\my-app` 과 `C:\projects\my-app` 은 같은 폴더로 봅니다). 출력에 새로 만들거나 바꾼 파일이 한 줄씩 나옵니다.
 
 `npm link` 없이 긴 명령으로도 됩니다. 원본의 설치 도구에 레포 경로를 줍니다.
 
@@ -237,6 +237,7 @@ cd C:\projects\my-app; rail-install
 | `isolation` | `shared`(모두 한 폴더) 또는 `worktree`(만드는 작업자마다 git worktree). 사람만 바꿈 | `shared` |
 | `worktreeDir` | worktree 를 만들 폴더 | `~/orca/workspaces/<레포 폴더 이름>` |
 | `codexRoles` | Codex 로 띄울 역할 | `["final-review"]` |
+| `workerModels` | 작업자 역할별 Claude 모델. 예 `{"default": "opus", "check": "sonnet"}`. 역할 → `default` → `opus` 순으로 찾습니다. Codex 작업자에는 쓰지 않습니다 | 없음(모두 `opus`) |
 | `staleTests` | 잠긴 시험을 고쳐야 할 때 판정을 사람(`human`)이 할지 판정 작업자(`agent`)가 할지. `agent` 여도 한 마일스톤에 시험 파일 5개를 넘으면 사람에게 묻습니다 | `human` |
 | `notify.bot` | 마일스톤 닫힘·폭주 알림을 보낼 Orca 봇 이름 | 없음(안 보냄) |
 | `insurance` | 보험 부품(끄지 않고 빼기 후보에도 올리지 않음). 순서 검사 `gate:order` 는 여기 없어도 끄지 않고 후보에 올리지 않습니다 | `["guard-tests", "stop-check", "gate:close"]` |
@@ -324,7 +325,7 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
 - **관문이 보지 않는 안내가 있습니다.** 기획서의 `승인:` 줄이 없어도 `advance decide` 는 넘어갑니다. `step-done` 은 커밋 여부를 보지 않습니다(커밋 전의 검사 명령 통과는 마무리 검사 훅이 봅니다). 리뷰 작업자가 쓰는 `.rail/review/<step>.json` 을 읽는 코드가 없습니다. 이것들은 리더가 "다음 할 일"과 스킬을 따라 지킵니다. 무엇을 코드가 막고 무엇을 리더가 지키는지는 [HOW-IT-WORKS 3절](HOW-IT-WORKS.md#3-판정은-누가-하나)의 표에 있습니다.
 - **`isolation: worktree` 에서는 새 worktree 폴더마다 Claude Code 가 "이 폴더를 믿습니까?"를 물을 수 있습니다.** 기본 선택이 "No, exit" 라서, 사람이 없으면 작업자가 뜨자마자 끝날 수 있습니다. 믿은 레포의 worktree 도 묻는지는 확인하지 못했습니다. `shared` 방식(기본)은 리더와 같은 폴더라 묻지 않습니다.
 - **리더가 Orca 오케스트레이션의 작업자로 떠 있으면 `worker start` 가 일을 맡기지 못합니다.** Orca 가 작업자 안에서 `--terminal` 로 일을 맡기는 것을 막기 때문입니다. 리더는 사람이 연 Orca 창에서 띄우세요.
-- **Windows 에서 직접 돌려 보지 못했습니다.** 작업자 명령은 Windows 면 PowerShell 문법(`$env:RAIL_ALLOW_TEST_EDIT='1'; claude …`, `cd '…'; …`)으로 씁니다. Orca 의 Windows 터미널 셸이 cmd.exe 이면 이 문법이 맞지 않습니다. 레일 시험은 CI 의 windows-latest 에서 돌지만, 실제 Orca 창에 작업자를 띄우는 부분과 Claude Code 의 Windows 훅 실행은 CI 로 확인할 수 없습니다.
+- **Windows 는 일부만 직접 확인했습니다.** Windows 11 에서 설치, 명령, 훅, `npm test` 를 확인했습니다. `/rail` 대화형 진행, Orca 작업자, automations, Codex 는 아직 보지 않았습니다. 작업자 명령은 Windows 면 PowerShell 문법(`$env:RAIL_ALLOW_TEST_EDIT='1'; claude …`, `cd '…'; …`)으로 씁니다. Orca 의 Windows 터미널 셸이 cmd.exe 이면 이 문법이 맞지 않습니다. 레일 시험은 CI 의 windows-latest 에서 돌지만, 실제 Orca 창에 작업자를 띄우는 부분과 Claude Code 의 Windows 훅 실행은 CI 로 확인할 수 없습니다.
 - **Orca 없이 쓰면** 기획과 상태 명령은 되지만, 작업자 띄우기·닫기와 리더 깨우기는 손으로 해야 합니다(하위 에이전트에 명세를 주고 `log worker_start` 로 남기라고 `status` 가 안내합니다. 이때 `log` 는 "손으로 쓰지 마세요" 경고를 내지만 기록은 남깁니다).
 
 ## 12. 문제 해결
@@ -334,6 +335,7 @@ orca automations create --name "my-app 밤샘" --trigger "*/30 * * * *" `
 - **작업자 창이 안 보입니다.** 리더 탭에 자리가 없으면(작업자 세 명) `worker start` 가 작업자만 있는 탭을 나누거나 새 탭을 엽니다. 새 탭이면 출력에 `[새 탭]` 줄과 탭 이름이 나옵니다. 리더가 그 이름을 전하니 Orca 에서 그 탭을 엽니다.
 - **작업자가 안 뜹니다.** `node .rail/bin/rail.mjs status` 의 작업자 줄과 출력의 `[작업자 실패]` 까닭을 봅니다. "명세 파일이 없습니다"면 `.orchestration/<step>-spec.md` 를 먼저 씁니다. "리더 자신이 작업자라서"면 11절의 Orca 제한입니다. Codex 를 고른 step 인데 `codex` 명령이 없으면 Claude 로 대신 띄우고 "[경고] codex 명령이 PATH 에 없어…"를 냅니다.
 - **마일스톤이 시작되지 않습니다.** `advance milestone` 의 "빠진 것"을 봅니다. 기획서 "결정과 시험" 줄의 상태 말은 정해진 말이어야 합니다. 결정은 `선택함 (<고른 것>)`, `AI가 고름(위임)`, `미룸(2026-12-01)`, 시험은 `통과`, `통과(작은 예제 범위까지만)`, `판단 보류(2026-12-01)` 만 풀린 것으로 봅니다. "통과 못함"이나 기한 없는 "미룸"은 풀린 것이 아니고, 기한이 지나면 다시 막힙니다.
+- **Windows 에서 시험 잠금이 이미 있는 시험 파일 고치기를 막지 못합니다.** 증상: 같은 파일인데 경로를 다르게 적으면(Git Bash 꼴 `/c/Users/…`, `RUNNER~1` 같은 8.3 짧은 이름, `TESTS\X.TEST.MJS` 처럼 대소문자만 다른 꼴) 잠금이 지나갑니다. 까닭: 옛 훅은 경로를 글자 그대로 저장소 뿌리와 견줬습니다. 지금 훅(`.rail/hooks/lib.mjs` 의 `canonPath`)은 이런 꼴을 `C:\…` 실제 경로로 풀고 소문자로 견줍니다. 확인법: 레일을 업데이트한 뒤 레포 폴더의 PowerShell 에서 `'{"cwd":".","tool_name":"Edit","tool_input":{"file_path":"/c/projects/my-app/tests/x.test.mjs"}}' | node .rail/hooks/guard-tests.mjs` 처럼 이미 있는 시험 파일을 Git Bash 꼴 경로로 넣어 봅니다. `"permissionDecision":"deny"` 가 나오면 막힌 것입니다. 아무것도 안 나오면 `.rail/hooks/lib.mjs` 에 `canonPath` 가있는지 봅니다.
 - **Windows 에서 줄바꿈이 섞입니다.** 이 저장소는 `.gitattributes` 로 LF 를 고정합니다. 제품 레포에서도 같은 줄(`* text=auto eol=lf`)을 두면 시험 잠금과 상태 비교가 안정합니다. 레일은 파일을 읽을 때 CRLF 를 LF 로 바꿔 읽습니다.
 - **자율 모드가 바로 멈춥니다.** `node .rail/bin/rail.mjs next` 가 멈춤 까닭을 한 줄로 알려 줍니다. `next --precheck` 는 리더 세션 자신이 남긴 작업 중 표시도 남의 것으로 보므로, 방금 레일 명령을 부른 뒤면 `busy` 가 나옵니다. `busyMinutes`(기본 20분)가 지나면 풀립니다.
 

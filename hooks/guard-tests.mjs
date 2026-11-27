@@ -5,7 +5,7 @@
 // RAIL_ALLOW_TEST_EDIT=1이면 통과한다.
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { BASELINE, baselineFiles, git, isTestPath, railLog, readStdinJson, repoRoot, toRepoRel } from './lib.mjs'
+import { BASELINE, WIN, baselineFiles, caseKey, git, isTestPath, railLog, readStdinJson, repoRoot, toRepoRel } from './lib.mjs'
 
 const HINT =
   '이미 있는 시험 파일과 fixtures/ 는 구현 작업자가 고치지 않는다. 시험이 틀렸다고 보면 고치지 말고 worker_done에 까닭을 적어라(레일 관문 규칙). ' +
@@ -14,21 +14,21 @@ const HINT =
 // 기준선에 든 파일 중 spec(파일 또는 폴더)에 걸리는 것. 기준선 파일이 있으면 그 자신도 포함한다.
 function inBaseline(root, spec) {
   if (!existsSync(path.join(root, BASELINE))) return null
-  const list = [...baselineFiles(root), BASELINE]
+  const list = [...baselineFiles(root), BASELINE].map(caseKey)
   return list.find((f) => spec === '.' || f === spec || f.startsWith(spec.replace(/\/$/, '') + '/')) ?? null
 }
 
-// git이 추적하거나 스테이징한 파일 목록(인덱스) 중 pathspec에 맞는 것.
+// git이 추적하거나 스테이징한 파일 목록(인덱스) 중 pathspec에 맞는 것. Windows 에서는 대소문자를 가리지 않는다(:(icase)).
 function tracked(root, spec, literal) {
-  const args = literal ? ['--literal-pathspecs'] : []
-  const r = git(root, [...args, 'ls-files', '-z', '--', spec])
-  return r.ok ? r.out.split('\0').filter(Boolean) : []
+  const magic = [literal && 'literal', WIN && 'icase'].filter(Boolean).join(',')
+  const r = git(root, ['ls-files', '-z', '--', magic ? `:(${magic})${spec}` : spec])
+  return r.ok ? r.out.split('\0').filter(Boolean).map(caseKey) : []
 }
 
 // 파일 도구(Edit, Write 등)가 가리킨 경로가 잠긴 시험 파일이면 그 상대 경로를 돌려준다.
 function lockedFile(root, cwd, filePath) {
   if (!filePath) return null
-  const rel = toRepoRel(root, path.resolve(cwd, filePath))
+  const rel = toRepoRel(root, cwd, filePath)
   if (rel.startsWith('..') || path.isAbsolute(rel)) return null
   if (inBaseline(root, rel) === rel) return rel
   if (!isTestPath(rel)) return null
@@ -153,7 +153,7 @@ function targetsOf(words) {
 // 낱말이 가리키는 추적 중인 시험 파일 하나를 돌려준다. 없으면 null.
 function lockedWord(root, cwd, word, ps) {
   if (!word || word.includes('$') || word.includes('`') || word === '/dev/null') return null
-  const rel = toRepoRel(root, path.resolve(cwd, ps ? word.replace(/\\/g, '/') : word))
+  const rel = toRepoRel(root, cwd, ps ? word.replace(/\\/g, '/') : word)
   if (rel.startsWith('..') || path.isAbsolute(rel)) return null
   const spec = rel === '' ? '.' : rel
   return tracked(root, spec, false).find(isTestPath) ?? inBaseline(root, spec)

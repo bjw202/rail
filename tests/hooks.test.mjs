@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { readFileSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { denied, git, makeRepo, put, runHook } from './helpers.mjs'
+import { WIN, denied, git, makeRepo, put, runHook } from './helpers.mjs'
 
 const repo = makeRepo()
 const call = (tool_name, tool_input, env = {}) => runHook('guard-tests.mjs', { hook_event_name: 'PreToolUse', cwd: repo, tool_name, tool_input }, env)
@@ -81,6 +83,44 @@ describe('시험 파일 잠금: PowerShell', () => {
     ['따옴표 안 글', 'git commit -m "Remove-Item tests/x.test.mjs"']
   ])
     test(`${name} → 허용`, () => assert.equal(denied(ps(cmd)), false))
+})
+
+// 같은 파일을 다른 꼴로 적은 경로도 잠근다(hooks/lib.mjs canonPath). 맥의 임시 폴더는 /var → /private/var 링크이고,
+// Windows CI 의 임시 폴더는 8.3 짧은 이름(RUNNER~1 꼴)이다. 시험 저장소는 실제 경로(realpath)에 있다.
+describe('시험 파일 잠금: 다른 꼴의 경로', () => {
+  test('임시 폴더를 링크나 짧은 이름 그대로 적어도 거절', () => {
+    const alias = path.join(tmpdir(), path.relative(realpathSync.native(tmpdir()), repo), 'tests', 'x.test.mjs')
+    assert.ok(denied(call('Edit', { file_path: alias })))
+  })
+})
+
+// Windows 에서 뚫렸던 세 경우: Git Bash 꼴 경로, 8.3 짧은 이름, 대소문자 차이. 맥·리눅스에서는 건너뛴다.
+describe('시험 파일 잠금: Windows 경로 꼴', { skip: !WIN && 'Windows 에서만 뜻이 있다' }, () => {
+  const unix = WIN ? `${repo[0].toLowerCase()}${repo.slice(2).replace(/\\/g, '/')}/tests/x.test.mjs` : ''
+  for (const pre of ['/', '/cygdrive/', '/mnt/'])
+    test(`Git Bash 꼴 ${pre}c/... 경로 → 거절`, () => {
+      assert.ok(denied(call('Edit', { file_path: pre + unix })))
+      assert.ok(denied(bash(`rm -f ${pre + unix}`)))
+    })
+  // 시험이 만든 임시 저장소의 짧은 이름(예 RAIL-H~1). 드라이브가 8.3 이름을 만들지 않으면(fsutil 8dot3name 꺼짐) 짧은 이름이 없어 건너뛴다.
+  const short = WIN
+    ? spawnSync('powershell', ['-NoProfile', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${repo}').ShortPath`], { encoding: 'utf8' }).stdout.trim()
+    : ''
+  const noShort = WIN && (!short.includes('~') || short.toLowerCase() === repo.toLowerCase()) && `이 드라이브는 8.3 짧은 이름을 만들지 않는다 (받은 값: ${short || '없음'})`
+  test('8.3 짧은 이름 경로 → 거절', { skip: noShort }, () => {
+    assert.ok(denied(call('Edit', { file_path: path.join(short, 'tests', 'x.test.mjs') })))
+    assert.ok(denied(call('PowerShell', { command: `Remove-Item '${short}\\fixtures\\doc.txt'` })))
+  })
+  test('대소문자가 다른 경로 → 거절', () => {
+    assert.ok(denied(call('Edit', { file_path: repo[0].toLowerCase() + repo.slice(1) + '\\TESTS\\X.Test.MJS' })))
+    assert.ok(denied(call('PowerShell', { command: 'Remove-Item Fixtures\\DOC.txt' })))
+  })
+  test('지워진 추적 파일을 대소문자 다르게 되살리기 → 거절 (git ls-files :(icase))', () => {
+    const r = makeRepo()
+    rmSync(path.join(r, 'tests', 'x.test.mjs'))
+    const res = runHook('guard-tests.mjs', { hook_event_name: 'PreToolUse', cwd: r, tool_name: 'Bash', tool_input: { command: 'git checkout -- TESTS/X.TEST.MJS' } })
+    assert.ok(denied(res))
+  })
 })
 
 describe('마무리 검사', () => {
