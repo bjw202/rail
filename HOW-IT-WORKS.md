@@ -104,7 +104,7 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 |---|---|---|
 | 단계 순서. 지금 단계에서 갈 수 있는 다음 단계 하나만 허용 | `check`, `advance` | `scripts/lib/gates.mjs:gate` (`NEXT_OF`) |
 | 다음 마일스톤 건너뛰기. 기획서 지도에서 아직 안 닫힌 첫 마일스톤만 시작 | `advance decide` | `gates.mjs` 의 `ORDER.decide` |
-| 착수 전 결정·시험이 풀렸는지. 정해진 상태 말과 정확히 맞아야 하고 기한이 지난 "미룸"·"판단 보류"는 다시 막음 | `advance milestone` | `gates.mjs` 의 `ORDER.milestone` → `scripts/lib/docs.mjs:openRisks`, `decisionStatus` |
+| 착수 전 결정·시험이 풀렸는지. 정해진 상태 말과 정확히 맞아야 하고 기한이 지난 "미룸"·"판단 보류"는 다시 막음. 뒤 결정에 바뀐 `결정: 바뀜 (→ D-xx)` 도 풀린 것이 아니라서, 착수 전에 걸려 있으면 막고 "바뀜이면 새 번호를 착수 전에 적는다"고 알림 | `advance milestone` | `gates.mjs` 의 `ORDER.milestone` → `scripts/lib/docs.mjs:openRisks`, `decisionStatus` |
 | 머리줄만 있는 빈 step 표로 장면 단계에 가기 | `advance check` | `gates.mjs` 의 `ORDER.check` |
 | step 을 시작하거나 끝내기: `milestone` 단계, 지금 마일스톤 표에 있는 줄, 아직 안 끝남 | `step-start`, `step-done` | `gates.mjs:stepGate` |
 | 기능 줄 끝내기: 확인 기록이 있고, `must` 가 있으면 고침 작업자가 닫혔음 | `step-done` | `scripts/lib/check.mjs:featureProblems` (부름: `steps.mjs:cmdStepDone`) |
@@ -139,6 +139,8 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | 확인 작업자 지시서에 만든 작업자의 대화·해석을 넣지 않음 | 틀과 안내 문장만 줍니다 | `check.mjs:featureHint`, `templates/.rail/check/template.md` |
 | 마지막 리뷰 지시서에 그 마일스톤의 diff 범위만 넣음, 판정으로 고친 시험 목록을 넣음, 승인 뒤 더한 줄·결정이 앞 결정·깨진 가정과 맞는지와 틀리면 어떤 확인에서 드러나는지 보게 함 | 목록은 안내 문장에 붙여 줍니다 | `status.mjs:startHint`, `skills/rail-milestone/workers.md` |
 | 기획서 "살아 있는 세 줄"을 닫기 전에 고침, "## 나중에"도 봄 | 줄에 그 마일스톤 번호가 없으면 먼저 고치고 "## 나중에"도 보라고 안내합니다. 관문은 아니고, "## 나중에"의 줄은 세지 않습니다 | `status.mjs` 의 `livingHint` |
+| 기획서를 지금 사실로 둠: 범위가 바뀌면 맨 위 네 줄과 "## 화면" 은 덧붙이지 않고 다시 쓰고 까닭은 계획 변경에 한 줄, 바뀐 옛 결정은 지우지 않고 `결정: 바뀜 (→ D-xx)`, 동작이 바뀐 옛 장면은 지우지 않고 자동 확인·사람이 볼 점을 지금 동작으로 고침 | 스킬 문장입니다. 코드는 맨 위 네 줄이 지금과 맞는지, 옛 결정에 표시가 붙었는지 보지 않습니다. `바뀜` 은 `decisionStatus` 가 풀린 것으로 보지 않아 착수 전에 걸려 있을 때만 막히고, 기획서 검사·계획 밖 결정 수(새 번호만 셈)에는 영향이 없습니다 | `skills/rail-plan/SKILL.md`, `skills/rail/SKILL.md` 1번, `docs.mjs:decisionStatus` |
+| `CLAUDE.md` 의 "## 코드 지도"(폴더·모듈마다 맡은 일, 자료가 흐르는 길 하나, 깨면 안 되는 약속, 15줄 안쪽): M0 을 닫을 때 만든 코드 그대로 처음 채우고 마일스톤을 닫을 때마다 고침(절이 없으면 그때 만듦). 작업자는 먼저 읽고 다른 구조를 만들었으면 보고에 적고, 마지막 리뷰는 기획서의 지금 사실과 코드 지도가 이번 변경과 맞는지 봄 | 스킬 문장과 틀의 빈칸입니다. 코드는 지도가 있는지, 코드와 맞는지 보지 않습니다 | `skills/rail-check/SKILL.md`, `skills/rail-milestone/workers.md`, `templates/CLAUDE.md` |
 | 리허설 통과를 사람의 판정으로 기록하지 않음 | 스킬 문장입니다 | `skills/rail-check/SKILL.md` |
 | 커밋 정책과 자율 모드는 사람이 이 세션에서 직접 말했을 때만 바꿈 | 코드는 이 둘에 `--said` 를 요구하지 않습니다(`isolation`·부품 끄기·미리 승인만 요구) | `skills/rail/SKILL.md`, `policy.mjs` |
 | 작업자를 버리는 `worker done --force` 는 사람이 정했을 때만 | 스킬 문장입니다 | `skills/rail-milestone/workers.md` |
@@ -338,8 +340,8 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 | `.rail/proto/D-xx/<변주>/`, `compare.html` | 시제품 지시서·결과·비교 페이지(git 에 넣지 않음) | `proto.mjs`, 시제품 작업자 |
 | `.rail/reference/Mx/` | 고른 시제품 화면(기준 화면, git 에 넣음) | `proto.mjs:protoPick` |
 | `.rail/trial/T-xx/` | 가정 시험 지시서와 버리는 코드(git 에 넣지 않음) | 리더 |
-| `docs/PLAN.md`, `docs/plan/Mx.md`, `docs/decisions/D-xx-*.md`, `docs/plan/refs/` | 기획서(끝의 "## 나중에"는 주인이 나중에라고 한 일을 주인 말 그대로 한 줄씩 두는 자리, 코드는 읽지 않고 기획서 검사도 요구하지 않음), step 표, 시제품 카드, 참고 서랍 | 리더(상태 칸과 지도 줄 끝 ✅ 는 스크립트) |
-| `CLAUDE.md` | 모든 세션이 처음 읽는 짧은 개발 메모(제품 한 줄, 레일 문서 자리, 명령, 비밀 키, 되돌리기 어려운 일, 배운 규칙). 없을 때만 설치가 틀(`templates/CLAUDE.md`)로 만들고, 레일 코드는 읽지 않습니다 | 리더(빈칸은 기획서 승인 뒤, 배운 규칙은 사람이 승인한 뒤) |
+| `docs/PLAN.md`, `docs/plan/Mx.md`, `docs/decisions/D-xx-*.md`, `docs/plan/refs/` | 기획서(덧붙이는 기록이 아니라 지금 사실이라 맨 위 네 줄과 "## 화면" 은 범위가 바뀌면 다시 쓰고, 바뀐 옛 결정은 `결정: 바뀜 (→ D-xx)` 로 남김. 끝의 "## 나중에"는 주인이 나중에라고 한 일을 주인 말 그대로 한 줄씩 두는 자리, 코드는 읽지 않고 기획서 검사도 요구하지 않음), step 표, 시제품 카드, 참고 서랍 | 리더(상태 칸과 지도 줄 끝 ✅ 는 스크립트) |
+| `CLAUDE.md` | 모든 세션이 처음 읽는 짧은 개발 메모(제품 한 줄, 레일 문서 자리, 명령, 비밀 키, 되돌리기 어려운 일, 코드 지도, 배운 규칙). 없을 때만 설치가 틀(`templates/CLAUDE.md`)로 만들고, 레일 코드는 읽지 않습니다. 그래서 이미 레일을 깐 제품에는 "## 코드 지도" 절이 없고, 리더가 다음에 마일스톤을 닫을 때 만듭니다 | 리더(빈칸은 기획서 승인 뒤, 코드 지도는 M0 을 닫을 때 처음 쓰고 마일스톤을 닫을 때마다 고침, 배운 규칙은 사람이 승인한 뒤) |
 
 ### 환경 변수
 
@@ -437,19 +439,19 @@ step 표의 "기다리는 step" 칸이 비면 표에서 앞선 step 을 모두 �
 
 ## 10. 크기
 
-이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-27, 포콕 비교에서 나온 보강 A~F 를 반영한 뒤).
+이 저장소에서 `wc -l` 로 센 줄 수입니다(2026-11-27, 기획서를 "지금 사실"로 두기와 코드 지도를 반영한 뒤).
 
 | 묶음 | 파일 | 줄 |
 |---|---|---|
 | 레일 실행 코드: 입구와 모듈 | `scripts/rail.mjs`, `scripts/lib/*.mjs` 27개 | 2,899 (입구 69, 모듈 2,830) |
 | 레일 실행 코드: 훅 | `hooks/*.mjs` 4개 | 522 |
-| 레일 실행 코드 합 | | **3,421** (포콕 비교 보강 A~F 는 안내 문자열 두 곳의 글자만 바꿔 줄 수 그대로) |
+| 레일 실행 코드 합 | | **3,421** (지금 사실·코드 지도는 `docs.mjs` 의 안내 문자열과 주석 한 곳씩의 글자만 바꿔 줄 수 그대로) |
 | 설치 도구 | `scripts/install.mjs` | 149 |
-| 스킬 | `skills/*/*.md` 5개 | 141 |
-| 시작 틀 | `templates/` 9개(`docs/RAIL.md` 38줄, `CLAUDE.md` 11줄 포함) | 237 |
-| 시험 | `tests/*.mjs` 25개(시험 파일 24개와 도우미) | 4,582 |
+| 스킬 | `skills/*/*.md` 5개 | 143 |
+| 시작 틀 | `templates/` 9개(`docs/RAIL.md` 38줄, `CLAUDE.md` 14줄 포함) | 240 |
+| 시험 | `tests/*.mjs` 26개(시험 파일 25개와 도우미) | 4,643 |
 
-시험 수는 맥에서 285개이고, `npm test` 를 돌리면 284개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). Windows 에서만 도는 시험 잠금 경로 묶음(Git Bash 꼴, 8.3 짧은 이름, 대소문자) 6개는 맥에서는 묶음째 건너뛰어 수에 들지 않습니다. 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
+시험 수는 맥에서 290개이고, `npm test` 를 돌리면 289개 통과, 1개 건너뜀(Windows 에서만 도는 시험), 실패 0개입니다(직접 돌려 확인). Windows 에서만 도는 시험 잠금 경로 묶음(Git Bash 꼴, 8.3 짧은 이름, 대소문자) 6개는 맥에서는 묶음째 건너뛰어 수에 들지 않습니다. 제품 레포에 깔린 레일의 크기는 `usage.mjs:railSize` 가 `.rail/bin`, `.rail/hooks`, `.claude/skills/rail*`, `docs/RAIL.md` 의 줄바꿈 수로 세어 `rail_size` 사건에 남깁니다.
 
 ## 11. 코드가 보지 않는 것
 
