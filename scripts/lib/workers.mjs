@@ -164,8 +164,8 @@ export function workerStart(steps, flags, usage) {
     const undo = () => wt && withLock(() => removeWorktree({ step: p.step, branch: wt.branch, path: wt.worktree }))
     const g = p.grant?.at ? p.grant : null
     if (p.grant?.refused) out(`[시험 고치기] ${p.step}: ${p.grant.refused}`)
-    if (g?.by === 'stale' && !read(p.spec).includes(`(판정 ${g.file})`))
-      fs.appendFileSync(p.spec, `\n\n## 고쳐도 되는 시험 줄 (레일이 붙임, 판정 ${g.file})\n${g.lines.map((l) => `- ${l.file}:${l.line} — ${l.changed_by} 로 바뀐 동작(옛 값: ${l.pinned})`).join('\n')}\n이 줄들만 새 동작에 맞게 고친다. 판정 파일의 keep 줄과 다른 시험은 고치지 말고, 걸리면 코드를 고치거나 worker_done 에 까닭을 적는다.\n`)
+    if (g?.by === 'stale' && !read(p.spec).includes(`(판정 ${g.file}, ${g.at})`))
+      fs.appendFileSync(p.spec, `\n\n## 고쳐도 되는 시험 줄 (레일이 붙임, 판정 ${g.file}, ${g.at})\n${g.lines.map((l) => `- ${l.file}:${l.line} — ${l.changed_by} 로 바뀐 동작(옛 값: ${l.pinned})`).join('\n')}\n이 줄들만 새 동작에 맞게 고친다. 판정 파일의 keep 줄과 다른 시험은 고치지 말고, 걸리면 코드를 고치거나 worker_done 에 까닭을 적는다.\n`)
     if (g?.by === 'new-test' && !read(p.spec).includes('(이번 마일스톤에 생긴 시험)'))
       fs.appendFileSync(p.spec, `\n\n## 고쳐도 되는 시험 (레일이 붙임, 이번 마일스톤에 생긴 시험)\n${g.files.map((f) => `- ${f}`).join('\n')}\n확인 기록의 must 가 가리킨 이 파일만 고친다. 다른 시험은 고치지 말고, 걸리면 코드를 고치거나 worker_done 에 까닭을 적는다.\n`)
     const cmd = agentCommand(agent, p.name, !!g, { cd: wt?.worktree, model: workerModel(role) })

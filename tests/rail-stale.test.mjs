@@ -91,6 +91,19 @@ describe('판정으로 시험 고치기 허락', () => {
     assert.equal(granted(root).length, 1)
   })
 
+  test('같은 step 의 두 번째 판정(같은 판정 파일 이름)도 다음 작업자 명세에 새 줄을 붙인다(tiny-61 리허설에서 본 빈틈)', () => {
+    const { root, orca } = workerRoot()
+    judge(root, orca, [line('tests/a.test.mjs', 3, 'stale')])
+    ok(start(root, orca))
+    ok(run(root, ['worker', 'done', 'M0-1'], orca.env))
+    judge(root, orca, [line('tests/c.test.mjs', 12, 'stale')])
+    ok(start(root, orca))
+    assert.equal(granted(root).length, 2)
+    const spec = readFileSync(path.join(root, '.orchestration/M0-1-spec.md'), 'utf8')
+    assert.equal(spec.match(/## 고쳐도 되는 시험 줄 \(레일이 붙임, 판정 \.rail\/stale\/M0-1\.json, /g)?.length, 2)
+    assert.match(spec, /tests\/c\.test\.mjs:12/)
+  })
+
   for (const [name, text, why] of [
     ['모두 keep', [line('tests/a.test.mjs', 3, 'keep')], /모두 keep/],
     ['판정 파일 없음', null, /없거나 꼴이 틀렸습니다/],
