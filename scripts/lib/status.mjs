@@ -182,7 +182,7 @@ export function describe(st) {
   } else {
     pos = '모든 마일스톤 완료'
     const open = nextOpenMilestone(st, rm)
-    next = open ? `기획서 마일스톤 지도에 새 마일스톤 ${open} 이 있습니다 — 먼저 달라진 범위와 완료 기준을 주인에게 보여 주고 승인을 받았는지 본다(아직이면 보여 주고 묻는다). 받았으면 advance decide --milestone ${open}` : `남은 일이 없습니다. ${replanHint('주인이 기능을 더하자고 하면')} 버그·작은 수정·급한 장애·질문만은 rail 스킬 1번 갈래대로.`
+    next = open ? `기획서 마일스톤 지도에 새 마일스톤 ${open} 이 있습니다 — 먼저 달라진 범위와 완료 기준을 주인에게 보여 주고 승인을 받았는지 본다(아직이면 보여 주고 묻는다). 받았으면 advance decide --milestone ${open}` : `남은 일이 없습니다. ${replanHint('주인이 기능을 더하자고 하면')} · 버그·작은 수정·급한 장애·질문만이면 rail 스킬 1번 갈래대로`
     skill = open ? 'rail' : 'rail-plan'
   }
   if (st.human_ask && !/answer|질문을 바꿔 묻기/.test(next)) next += ` · 사람 답이 오면 answer "<답 그대로>" (출력이 [다시 묻기] 면 그 질문만 다시 묻고 턴을 끝내기)`
